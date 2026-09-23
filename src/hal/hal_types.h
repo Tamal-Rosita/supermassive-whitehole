@@ -43,10 +43,12 @@
 #include "../platform/arduboy/arduboy_renderer.h"
 #include "../platform/arduboy/arduboy_input.h"
 #include "../platform/arduboy/arduboy_storage.h"
+#include "../platform/arduboy/arduboy_audio.h"
 
 typedef ArduboyRenderer HalRenderer;
 typedef ArduboyInput    HalInput;
 typedef ArduboyStorage  HalStorage;
+typedef ArduboyAudio    HalAudio;
 
 // =============================================================================
 // Platform: Raylib (future — example skeleton for porting)

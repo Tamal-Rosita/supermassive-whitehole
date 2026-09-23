@@ -14,13 +14,15 @@ This project uses a **layered architecture** that separates game logic from plat
 │    game.h/cpp ← ONLY file using HAL     │
 ├─────────────────────────────────────────┤
 │  src/hal/  (HAL Interfaces)             │  ← API contracts (docs)
-│    renderer.h, input.h, storage.h       │
+│    renderer.h, input.h, storage.h,      │
+│    audio.h                              │
 │    hal_types.h ← Platform type selector │
 ├─────────────────────────────────────────┤
 │  src/platform/arduboy/  (Concrete HAL)  │  ← Arduboy2 wrappers
 │    arduboy_renderer.h                   │
 │    arduboy_input.h                      │
 │    arduboy_storage.h                    │
+│    arduboy_audio.h                      │
 └─────────────────────────────────────────┘
 ```
 
@@ -154,7 +156,7 @@ arduino-cli upload --fqbn arduboy:avr:arduboy --port /dev/ttyACM0 ./
 | **M0** | ✅ Complete | Full tree | Project scaffold, architecture, HAL interfaces, game state machine |
 | **M1** | ✅ Complete | `player.cpp`, `game.cpp`, `config.h`, `world.cpp` | Human-on-foot agile steering (small inertia feedback, small walk impulse, natural foot drag), full-screen pseudo-3D ground grid (vanishing point above screen, no visible horizon), configurable HUD position |
 | **M2** | ✅ Complete | `config.h`, `entity.h/cpp`, `player.h/cpp`, `world.h/cpp`, `game.h/cpp`, `assets/items_16.png`, `assets/sprites.h` | Zero-allocation static object pool, whitehole-proximate decaying money distribution curve (safely outside attraction force), `MIN_ITEM_SEPARATION=45`, collision detection, power-ups (coffee speed boost), money collectibles (Diamond + Bills with combo multipliers), 8 distinct food hazards (Apple, Pizza, Taco, Burger, Fries, Cake, Donut, Ice Cream with custom slow debuffs), despawning, and PROGMEM sprite rendering |
-| **M3** | ✅ Complete | `game.cpp` | Enable blackhole gravity pull effect, accretion particles and warp effect, `renderBlackhole()` with effects + spin |
-| **M4** | 📋 Planned | `game.cpp` | Polish `renderTitle()`, `renderGameOver()`, `renderHUD()`, converging grid distortion |
-| **M5** | 📋 Planned | `assets/sprites.h`, `game.cpp` | Replace primitives with PROGMEM bitmap sprites, 8-dir player animation |
+| **M3** | ✅ Complete | `config.h`, `game.cpp` | Enable blackhole gravity pull effect, accretion particles, entity absorption with mass/charge growth, `renderBlackhole()` with effects + spin |
+| **M4** | ✅ Complete | `config.h`, `game.h/cpp` | 2D spacetime grid curvature (gravitational lensing on vertical rays & horizontal lines), polished UI screens (attract mode title, arcade frame Game Over with dollar stats, HUD status badges & stamina end caps) |
+| **M5** | ✅ Complete | `hal/audio.h`, `arduboy_audio.h`, `audio_scores.h`, `sprites.h`, `game.h/cpp`, `.ino` | Audio HAL, ArduboyTones SFX (coin/diamond, bills, boost, food, absorb, gameover, menu), ambient cosmic heartbeat pulse, 8-dir player sprites, player outline set to none |
 | **M6** | 📋 Planned | All files | Playtesting, balance tuning, bug fixes |

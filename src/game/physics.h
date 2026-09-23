@@ -53,12 +53,10 @@
 //   This is accurate to ~3% and uses only integer operations.
 //   Fine for game logic — we don't need exact distances.
 //
-// FOR IMPLEMENTING AGENTS:
-//   - M2: Use checkOverlap() for player-entity collisions
-//   - M3: Use applyBlackholeGravity() on all entities each frame
-//   - M3: Use moveToward() for blackhole tracking player
-//   - All functions are implemented here — ready to use in M2/M3
-//
+// IMPLEMENTATION STATUS:
+//   - M2: checkOverlap() used for player-entity collisions
+//   - M3: applyBlackholeGravity() used on all entities each frame
+//   - M3: moveToward() used for blackhole tracking player
 // =============================================================================
 
 #ifndef PHYSICS_H

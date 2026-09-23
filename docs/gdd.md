@@ -82,7 +82,7 @@ TITLE → (Press A) → PLAYING → (Blackhole catches player) → GAME OVER
 - Blackhole speed: increases by 1/256 per frame
 - Blackhole charge (gravity radius): increases by 1/256 per frame
 - Spawn interval: decreases by 1 frame every 4 seconds, min 60 frames
-- Future (M3): Whitehole absorbs money and food, increasing mass and charge!
+- Whitehole absorbs money and food, increasing mass and charge (M3)
 
 ---
 
@@ -122,7 +122,7 @@ TITLE → (Press A) → PLAYING → (Blackhole catches player) → GAME OVER
 | M0 | Project scaffold, architecture, HAL interfaces | ✅ Complete |
 | M1 | Player movement with hybrid inertia physics, perspective ground grid | ✅ Complete |
 | M2 | Entity spawning, object pool, collision detection, power-ups, scoring | ✅ Complete |
-| M3 | Blackhole chase, gravity pull, difficulty ramp | 📋 Planned |
-| M4 | Polished UI (title, game over, HUD), converging grid | 📋 Planned |
-| M5 | Real sprites, visual effects, audio | 📋 Planned |
+| M3 | Blackhole chase, gravity pull, difficulty ramp, absorption growth | ✅ Complete |
+| M4 | Polished UI (title, game over, HUD), 2D spacetime grid curvature | ✅ Complete |
+| M5 | Real sprites, visual effects, audio HAL, SFX, ambient pulse | ✅ Complete |
 | M6 | Playtesting, balance tuning, jam submission | 📋 Planned |

@@ -15,12 +15,12 @@ Most urgent tasks, ordered by priority (p1 > p2).
 - [x] Whitehole gravity effects: pull entities (including player).
 - [x] Whitehole visual effects: grid distortion/warp effect and accretion particles.
 - [x] Fix HTML5 web emulator scroll when using arrow keys, getting game canvas out of sight and hide cursor when focusing/playing (GB Studio behavior).
-- [ ] Verify milestone M3 completion because agents didn't update architecture.md, gdd.md and TODO.md after implementation.
-- [ ] Finish with milestone M4: better warp effect and polish all UI screens (title, game over and HUD).
-- [ ] Continue with milestone M5.
-- [ ] Investigate about Arduboy audio output and music/sfx capabilities.
-- [ ] Add sound effects.
-- [ ] Add ambient music.
+- [x] Verify milestone M3 completion because agents didn't update architecture.md, gdd.md and TODO.md after implementation.
+- [x] Finish with milestone M4: better warp effect and polish all UI screens (title, game over and HUD).
+- [x] Continue with milestone M5.
+- [x] Investigate about Arduboy audio output and music/sfx capabilities.
+- [x] Add sound effects.
+- [x] Add ambient music.
 - [ ] Finish with milestone M6.
 
 ## Desired for the jam (priority 3-4)

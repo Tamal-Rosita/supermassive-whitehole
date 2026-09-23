@@ -31,6 +31,7 @@
 #include "src/platform/arduboy/arduboy_input.h"
 #include "src/platform/arduboy/arduboy_renderer.h"
 #include "src/platform/arduboy/arduboy_storage.h"
+#include "src/platform/arduboy/arduboy_audio.h"
 #include <Arduboy2.h>
 
 // =============================================================================
@@ -40,9 +41,11 @@
 // No dynamic allocation — everything is static.
 
 Arduboy2 arduboy;                  // Hardware abstraction (Arduboy2 library)
+Arduboy2Audio Arduboy2Base::audio; // Static audio member required by Arduboy2
 ArduboyRenderer renderer(arduboy); // Renderer HAL → wraps Arduboy2 draw calls
 ArduboyInput input(arduboy);       // Input HAL → wraps Arduboy2 button calls
 ArduboyStorage storage;            // Storage HAL → wraps EEPROM
+ArduboyAudio audio(arduboy.audio); // Audio HAL → wraps ArduboyTones & Arduboy2Audio
 Game game;                         // The game itself
 
 uint32_t lastMillis = 0;
@@ -53,7 +56,7 @@ uint32_t lastMillis = 0;
 void setup() {
   arduboy.begin();
   arduboy.setFrameRate(TARGET_FPS);
-  game.init(storage);
+  game.init(storage, audio);
   lastMillis = millis();
 }
 

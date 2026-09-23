@@ -37,17 +37,12 @@
 //   STATE_TITLE    — Show title, high score, "Press A to Start"
 //   STATE_PLAYING  — Main gameplay loop
 //   STATE_GAMEOVER — Show final score, high score, retry/menu prompts
-//
-// FOR IMPLEMENTING AGENTS:
-//   - M1: Fill in renderPlayer(), renderBackground() (basic grid)
-//   - M2: Fill in updatePlaying() (spawning, collision, scoring)
-//         Fill in renderEntities() (draw each entity type as placeholder shape)
-//   - M3: Fill in renderBlackhole(), enable gravity in updatePlaying()
-//   - M4: Fill in renderTitle(), renderGameOver(), renderHUD()
-//         Fill in renderBackground() with converging grid effect
-//   - Each render method receives a HalRenderer& and calls draw methods
-//     (fillCircle, fillRect, drawLine, etc.) as documented in hal/renderer.h
-//
+// IMPLEMENTATION STATUS:
+//   - M1: renderPlayer(), renderBackground() (perspective ground grid) - Complete
+//   - M2: updatePlaying() (spawning, collision, scoring), renderEntities() - Complete
+//   - M3: renderBlackhole(), gravity pull, accretion particles, entity absorption - Complete
+//   - M4: Polished renderTitle(), renderGameOver(), renderHUD(), 2D grid curvature - Complete
+//   - M5: HalAudio, ArduboyAudio, sound effects, ambient pulse, visual polish - Complete
 // =============================================================================
 
 #ifndef GAME_H
@@ -57,7 +52,8 @@
 #include "player.h"
 #include "entity.h"
 #include "world.h"
-#include "../hal/hal_types.h"  // Brings in HalRenderer, HalInput, HalStorage
+#include "audio_scores.h"
+#include "../hal/hal_types.h"  // Brings in HalRenderer, HalInput, HalStorage, HalAudio
 
 // =============================================================================
 // GameState — Which screen/mode the game is in
@@ -87,14 +83,15 @@ public:
     uint8_t  gameOverCooldown; // Frames remaining before accepting input on game-over screen
 
     // =========================================================================
-    // init(storage) — One-time initialization
+    // init(storage, audio) — One-time initialization
     // =========================================================================
-    // Called once in setup(). Loads high score from persistent storage
-    // and enters the title state.
+    // Called once in setup(). Loads high score from persistent storage,
+    // initializes audio subsystem, and enters the title state.
     //
     // Parameters:
     //   storage — Platform storage for loading high score
-    void init(HalStorage& storage);
+    //   audio   — Platform audio for sound effects and music
+    void init(HalStorage& storage, HalAudio& audio);
 
     // =========================================================================
     // update(input) — Per-frame game logic update
@@ -127,8 +124,13 @@ public:
     //   STATE_GAMEOVER: renderGameOver()
     void render(HalRenderer& renderer);
 
+    // Audio playback helper
+    void playSound(SoundId sound);
+
 private:
     HalStorage* storageRef;  // Pointer to storage (for saving high score at game over)
+    HalAudio*   audioRef;    // Pointer to audio HAL (for SFX and ambient pulses)
+    uint8_t     ambientBeatTimer; // Timer for subtle background heartbeat / pulse
 
     // =========================================================================
     // reset() — Reset game state for a new game
@@ -377,6 +379,11 @@ private:
     static int16_t applyGridDistortion(int16_t px, int16_t py,
                                         int16_t bhSX, int16_t bhSY,
                                         int16_t strength, int16_t radiusSq);
+
+    static void applyGridDistortion2D(int16_t px, int16_t py,
+                                      int16_t bhSX, int16_t bhSY,
+                                      int16_t strength, int16_t radiusSq,
+                                      int16_t& outX, int16_t& outY);
 };
 
 #endif // GAME_H

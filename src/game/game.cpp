@@ -3,717 +3,889 @@
 // =============================================================================
 //
 // MILESTONES:
-//   M0: Skeleton with state machine and basic stubs (current)
-//   M1: renderPlayer(), renderBackground() (basic scrolling grid)
+//   M0: Skeleton with state machine and HAL architecture (completed)
+//   M1: renderPlayer(), renderBackground() perspective ground grid (completed)
 //   M2: updatePlaying() (spawning, collision, scoring), renderEntities()
-//   M3: Blackhole gravity in updatePlaying(), renderBlackhole()
-//   M4: renderTitle(), renderGameOver(), renderHUD(), converging grid
-//
-// FOR IMPLEMENTING AGENTS:
-//   This file has working state transitions and basic stubs.
-//   Each render/update method has a detailed TODO block describing
-//   exactly what to implement. Follow the comments in game.h for specs.
-//
+//   (completed) M3: Whitehole gravity in updatePlaying(), accretion particles,
+//   entity absorption (completed) M4: Polished title screen, game over screen,
+//   HUD, and 2D spacetime grid curvature (completed) M5: Audio HAL, sound
+//   effects, ambient cosmic pulse, visual polish (completed)
 // =============================================================================
 
 #include "game.h"
-#include "physics.h"
 #include "../../assets/sprites.h"
+#include "physics.h"
 
 // =============================================================================
 // init() — One-time setup
 // =============================================================================
-void Game::init(HalStorage& storage) {
-    storageRef = &storage;
-    highScore = storage.loadHighScore();
-    state = STATE_TITLE;
-    score = 0;
-    comboMultiplier = 1;
-    gameOverCooldown = 0;
+void Game::init(HalStorage &storage, HalAudio &audio) {
+  storageRef = &storage;
+  audioRef = &audio;
+  highScore = storage.loadHighScore();
+  state = STATE_TITLE;
+  score = 0;
+  comboMultiplier = 1;
+  gameOverCooldown = 0;
+  ambientBeatTimer = 0;
+}
+
+// =============================================================================
+// playSound() — Trigger sound effect through HalAudio
+// =============================================================================
+void Game::playSound(SoundId sound) {
+  if (!audioRef || !audioRef->isAudioEnabled())
+    return;
+  switch (sound) {
+  case SOUND_ID_DIAMOND:
+    audioRef->tones(sound_diamond);
+    break;
+  case SOUND_ID_BILLS:
+    audioRef->tones(sound_bills);
+    break;
+  case SOUND_ID_BOOST:
+    audioRef->tones(sound_boost);
+    break;
+  case SOUND_ID_FOOD:
+    audioRef->tones(sound_food);
+    break;
+  case SOUND_ID_ABSORB:
+    audioRef->tones(sound_absorb);
+    break;
+  case SOUND_ID_GAMEOVER:
+    audioRef->tones(sound_gameover);
+    break;
+  case SOUND_ID_MENU:
+    audioRef->tones(sound_menu);
+    break;
+  case SOUND_ID_AMBIENT_BEAT:
+    if (!audioRef->isPlaying()) {
+      audioRef->tones(sound_ambient_beat);
+    }
+    break;
+  default:
+    break;
+  }
 }
 
 // =============================================================================
 // update() — Per-frame dispatch
 // =============================================================================
-void Game::update(HalInput& input, fp_t dt) {
-    switch (state) {
-        case STATE_TITLE:
-            updateTitle(input, dt);
-            break;
-        case STATE_PLAYING:
-            updatePlaying(input, dt);
-            break;
-        case STATE_GAMEOVER:
-            updateGameOver(input, dt);
-            break;
-    }
+void Game::update(HalInput &input, fp_t dt) {
+  switch (state) {
+  case STATE_TITLE:
+    updateTitle(input, dt);
+    break;
+  case STATE_PLAYING:
+    updatePlaying(input, dt);
+    break;
+  case STATE_GAMEOVER:
+    updateGameOver(input, dt);
+    break;
+  }
 }
 
 // =============================================================================
 // render() — Per-frame dispatch
 // =============================================================================
-void Game::render(HalRenderer& renderer) {
-    switch (state) {
-        case STATE_TITLE:
-            renderTitle(renderer);
-            break;
-        case STATE_PLAYING:
-            renderPlaying(renderer);
-            break;
-        case STATE_GAMEOVER:
-            renderGameOver(renderer);
-            break;
-    }
+void Game::render(HalRenderer &renderer) {
+  switch (state) {
+  case STATE_TITLE:
+    renderTitle(renderer);
+    break;
+  case STATE_PLAYING:
+    renderPlaying(renderer);
+    break;
+  case STATE_GAMEOVER:
+    renderGameOver(renderer);
+    break;
+  }
 }
 
 // =============================================================================
 // reset() — Reset game state for a new game
 // =============================================================================
 void Game::reset() {
-    player.init();
-    world.init();
-    entities.init();
-    score = 0;
-    comboMultiplier = 1;
-    gameOverCooldown = 0;
+  player.init();
+  world.init();
+  entities.init();
+  score = 0;
+  comboMultiplier = 1;
+  gameOverCooldown = 0;
+  ambientBeatTimer = 0;
 
-    // M3: Initialize accretion particles
-    for (uint8_t i = 0; i < MAX_GRAVITY_PARTICLES; i++) {
-        particles[i].life = 0;
-    }
-    particleSpawnTimer = 0;
+  // M3: Initialize accretion particles
+  for (uint8_t i = 0; i < MAX_GRAVITY_PARTICLES; i++) {
+    particles[i].life = 0;
+  }
+  particleSpawnTimer = 0;
 
-    // Pre-populate 2 spacious items across the plane:
-    // 1. Diamond in the whitehole risk-reward orbit (52px from whitehole, safe from 30px charge)
-    // 2. Pizza hazard ahead in the flight path (>70px away from Diamond)
-    entities.spawn(ENTITY_COLLECTIBLE_DIAMOND, world.bhX + INT_TO_FP32(50), world.bhY - INT_TO_FP32(15));
-    entities.spawn(ENTITY_FOOD_PIZZA, player.x + INT_TO_FP32(25), player.y - INT_TO_FP32(65));
+  // Pre-populate 2 spacious items across the plane:
+  // 1. Diamond in the whitehole risk-reward orbit (52px from whitehole, safe
+  // from 30px charge)
+  // 2. Pizza hazard ahead in the flight path (>70px away from Diamond)
+  entities.spawn(ENTITY_COLLECTIBLE_DIAMOND, world.bhX + INT_TO_FP32(50),
+                 world.bhY - INT_TO_FP32(15));
+  entities.spawn(ENTITY_FOOD_PIZZA, player.x + INT_TO_FP32(25),
+                 player.y - INT_TO_FP32(65));
 }
 
 // =============================================================================
 // STATE: TITLE
 // =============================================================================
 
-void Game::updateTitle(HalInput& input, fp_t dt) {
-    world.timeAccum += dt;
-    while (world.timeAccum >= FP_DT_ONE) {
-        world.timeAccum -= FP_DT_ONE;
-        world.bhSpin++;
-    }
-    if (input.justPressed(BTN_A)) {
-        reset();
-        state = STATE_PLAYING;
-    }
+void Game::updateTitle(HalInput &input, fp_t dt) {
+  world.timeAccum += dt;
+  while (world.timeAccum >= FP_DT_ONE) {
+    world.timeAccum -= FP_DT_ONE;
+    world.bhSpin++;
+  }
+  if (input.justPressed(BTN_A)) {
+    playSound(SOUND_ID_MENU);
+    reset();
+    state = STATE_PLAYING;
+  }
 }
 
-void Game::renderTitle(HalRenderer& renderer) {
-    // 1. Full-screen cover image (128x64) with static whitehole blanked
-    renderer.drawSelfMasked(0, 0, title_screen_sprite, 0);
+void Game::renderTitle(HalRenderer &renderer) {
+  // 1. Full-screen cover image (128x64) with static whitehole blanked
+  renderer.drawSelfMasked(0, 0, title_screen_sprite, 0);
 
-    // 2. Animated swirling whitehole at bottom-right (x=92, y=30)
-    // Slower, majestic rotation using WHITEHOLE_ANIM_DIVISOR
-    uint8_t frame = (world.bhSpin / WHITEHOLE_ANIM_DIVISOR) % WHITEHOLE_FRAME_COUNT;
-    renderer.drawSelfMasked(TITLE_WHITEHOLE_X, TITLE_WHITEHOLE_Y, whitehole_sprite, frame);
+  // 2. Animated swirling whitehole at bottom-right (x=92, y=30)
+  // Slower, majestic rotation using WHITEHOLE_ANIM_DIVISOR
+  uint8_t frame =
+      (world.bhSpin / WHITEHOLE_ANIM_DIVISOR) % WHITEHOLE_FRAME_COUNT;
+  renderer.drawSelfMasked(TITLE_WHITEHOLE_X, TITLE_WHITEHOLE_Y,
+                          whitehole_sprite, frame);
 
-    // 3. High score in the open bottom-left area (smaller standard font per user request)
-    renderer.setCursor(6, 38);
-    renderer.print("High: ");
-    renderer.printNumber(highScore);
+  // 3. Ambient stardust sparkles orbiting near the title whitehole
+  uint8_t twinkle = (world.bhSpin / 6) % 4;
+  if (twinkle == 0)
+    renderer.drawPixel(TITLE_WHITEHOLE_X - 3, TITLE_WHITEHOLE_Y + 12,
+                       COLOR_WHITE);
+  if (twinkle == 1)
+    renderer.drawPixel(TITLE_WHITEHOLE_X + 33, TITLE_WHITEHOLE_Y + 10,
+                       COLOR_WHITE);
+  if (twinkle == 2)
+    renderer.drawPixel(TITLE_WHITEHOLE_X + 8, TITLE_WHITEHOLE_Y - 2,
+                       COLOR_WHITE);
+  if (twinkle == 3)
+    renderer.drawPixel(TITLE_WHITEHOLE_X + 26, TITLE_WHITEHOLE_Y + 33,
+                       COLOR_WHITE);
 
-    // 4. "Press A" prompt in the open bottom-left area (custom bold title font)
+  // 4. High score in the open bottom-left area with dollar sign
+  renderer.setCursor(6, 38);
+  renderer.print("High: $");
+  renderer.printNumber(highScore);
+
+  // 5. "Press A" prompt in the open bottom-left area with classic arcade blink
+  if ((world.bhSpin % 48) < 32) {
     drawTitleText(renderer, 6, 50, "Press A");
+  }
 }
 
 // =============================================================================
 // STATE: PLAYING
 // =============================================================================
 
-void Game::updatePlaying(HalInput& input, fp_t dt) {
-    // 1. Read input
-    bool up    = input.pressed(BTN_UP);
-    bool down  = input.pressed(BTN_DOWN);
-    bool left  = input.pressed(BTN_LEFT);
-    bool right = input.pressed(BTN_RIGHT);
-    bool accel = input.pressed(BTN_A);
-    bool justA = input.justPressed(BTN_A);
+void Game::updatePlaying(HalInput &input, fp_t dt) {
+  // 1. Read input
+  bool up = input.pressed(BTN_UP);
+  bool down = input.pressed(BTN_DOWN);
+  bool left = input.pressed(BTN_LEFT);
+  bool right = input.pressed(BTN_RIGHT);
+  bool accel = input.pressed(BTN_A);
+  bool justA = input.justPressed(BTN_A);
 
-    // 2. Update player movement with delta time
-    player.update(up, down, left, right, accel, justA, dt);
+  // 2. Update player movement with delta time
+  player.update(up, down, left, right, accel, justA, dt);
 
-    // 3. Update world (camera, blackhole, difficulty, timers) with delta time
-    world.update(player.x, player.y, dt);
+  // 3. Update world (camera, blackhole, difficulty, timers) with delta time
+  world.update(player.x, player.y, dt);
 
-    // 4. Spawn entities
-    if (world.shouldSpawn()) {
-        // Roll for entity type:
-        //   30% Diamond (+10 pts)
-        //   10% Dollar Bills (+25 pts)
-        //   15% Coffee powerup (speed boost + cleanse)
-        //   45% Food hazards (split evenly across 8 food hazards)
-        uint16_t roll = world.randomRange(0, 99);
-        EntityType spawnType;
-        if (roll < 30) {
-            spawnType = ENTITY_COLLECTIBLE_DIAMOND;
-        } else if (roll < 40) {
-            spawnType = ENTITY_COLLECTIBLE_BILLS;
-        } else if (roll < 55) {
-            spawnType = ENTITY_POWERUP_COFFEE;
-        } else {
-            // Food hazards (8 distinct types: APPLE through ICECREAM)
-            uint8_t foodRoll = world.randomRange(0, 7);
-            spawnType = (EntityType)(ENTITY_FOOD_APPLE + foodRoll);
-        }
-
-        bool isMoney = (spawnType == ENTITY_COLLECTIBLE_DIAMOND || spawnType == ENTITY_COLLECTIBLE_BILLS);
-
-        // Try candidate positions enforcing MIN_ITEM_SEPARATION and whitehole attraction safety
-        for (uint8_t attempt = 0; attempt < 4; attempt++) {
-            fp32_t wx = 0;
-            fp32_t wy = 0;
-
-            // Money spawns primarily (80%) near the whitehole with a decaying distribution curve,
-            // but safely outside its attraction force. On attempt 3, fallback to player path.
-            bool spawnNearWhitehole = isMoney && (attempt < 3) && (world.randomRange(0, 99) < MONEY_BH_SPAWN_CHANCE);
-
-            if (spawnNearWhitehole) {
-                // Whitehole Risk-Reward Zone:
-                // Safe distance starts beyond whitehole attraction radius (bhCharge) + safety buffer
-                // so that neither the item nor the player gets sucked in by the whitehole.
-                uint16_t minSafeDist = (uint16_t)FP_TO_INT(world.bhCharge) + MONEY_BH_SAFE_BUFFER;
-
-                // Decaying distribution curve peaked at minSafeDist:
-                // min(u1, u2) produces a linearly decaying density function:
-                // 75% of items spawn in the inner half of the orbit ring!
-                uint16_t u1 = world.randomRange(0, MONEY_BH_RING_SPAN);
-                uint16_t u2 = world.randomRange(0, MONEY_BH_RING_SPAN);
-                uint16_t offset = (u1 < u2) ? u1 : u2;
-                int16_t r = (int16_t)(minSafeDist + offset);
-
-                // Sample isotropic angle from 16-point unit circle lookup table
-                uint8_t dir = world.nextRandom() & 15;
-                int16_t dx = (int16_t)(((int32_t)UNIT_CIRCLE_X[dir] * r) / 127);
-                int16_t dy = (int16_t)(((int32_t)UNIT_CIRCLE_Y[dir] * r) / 127);
-
-                wx = world.bhX + INT_TO_FP32(dx);
-                wy = world.bhY + INT_TO_FP32(dy);
-
-                // Guard: ensure not right on top of player (< 35px)
-                if (approxDistance(wx, wy, player.x, player.y) < INT_TO_FP32(35)) {
-                    continue;
-                }
-
-                // Guard: ensure not out of camera despawn range
-                if (world.isTooFar(wx, wy)) {
-                    continue;
-                }
-            } else {
-                // Standard flight ring around player (used for food hazards, coffee, and open-field money)
-                int16_t dist = (int16_t)world.randomRange(SPAWN_MIN_DISTANCE, SPAWN_RADIUS);
-                int16_t dx = (int16_t)world.randomRange(0, dist);
-                int16_t dy = dist - dx;
-                if (world.nextRandom() & 1) dx = -dx;
-                if (world.nextRandom() & 1) dy = -dy;
-
-                // Bias 60% of spawns ahead in the player's movement direction
-                if ((player.vx != 0 || player.vy != 0) && (world.nextRandom() % 5 < 3)) {
-                    if (player.vx > 0 && dx < 0) dx = -dx;
-                    if (player.vx < 0 && dx > 0) dx = -dx;
-                    if (player.vy > 0 && dy < 0) dy = -dy;
-                    if (player.vy < 0 && dy > 0) dy = -dy;
-                }
-
-                wx = player.x + INT_TO_FP32(dx);
-                wy = player.y + INT_TO_FP32(dy);
-
-                // Guard: do not spawn inside the whitehole core or attraction radius
-                uint16_t minSafe = (uint16_t)FP_TO_INT(world.bhCharge) + 10;
-                if (approxDistance(wx, wy, world.bhX, world.bhY) <= INT_TO_FP32(minSafe)) {
-                    continue;
-                }
-            }
-
-            // Check separation against all existing active entities
-            bool tooClose = false;
-            for (uint8_t i = 0; i < MAX_ENTITIES; i++) {
-                if (entities.entities[i].active) {
-                    if (approxDistance(wx, wy, entities.entities[i].x, entities.entities[i].y) < INT_TO_FP32(MIN_ITEM_SEPARATION)) {
-                        tooClose = true;
-                        break;
-                    }
-                }
-            }
-
-            if (!tooClose) {
-                entities.spawn(spawnType, wx, wy);
-                break;
-            }
-        }
-
-        world.resetSpawnTimer();
+  // 4. Spawn entities
+  if (world.shouldSpawn()) {
+    // Roll for entity type:
+    //   30% Diamond (+10 pts)
+    //   10% Dollar Bills (+25 pts)
+    //   15% Coffee powerup (speed boost + cleanse)
+    //   45% Food hazards (split evenly across 8 food hazards)
+    uint16_t roll = world.randomRange(0, 99);
+    EntityType spawnType;
+    if (roll < 30) {
+      spawnType = ENTITY_COLLECTIBLE_DIAMOND;
+    } else if (roll < 40) {
+      spawnType = ENTITY_COLLECTIBLE_BILLS;
+    } else if (roll < 55) {
+      spawnType = ENTITY_POWERUP_COFFEE;
+    } else {
+      // Food hazards (8 distinct types: APPLE through ICECREAM)
+      uint8_t foodRoll = world.randomRange(0, 7);
+      spawnType = (EntityType)(ENTITY_FOOD_APPLE + foodRoll);
     }
 
-    // 5. Apply blackhole gravity to entities (M3: enabled)
-    for (uint8_t i = 0; i < MAX_ENTITIES; i++) {
+    bool isMoney = (spawnType == ENTITY_COLLECTIBLE_DIAMOND ||
+                    spawnType == ENTITY_COLLECTIBLE_BILLS);
+
+    // Try candidate positions enforcing MIN_ITEM_SEPARATION and whitehole
+    // attraction safety
+    for (uint8_t attempt = 0; attempt < 4; attempt++) {
+      fp32_t wx = 0;
+      fp32_t wy = 0;
+
+      // Money spawns primarily (80%) near the whitehole with a decaying
+      // distribution curve, but safely outside its attraction force. On attempt
+      // 3, fallback to player path.
+      bool spawnNearWhitehole =
+          isMoney && (attempt < 3) &&
+          (world.randomRange(0, 99) < MONEY_BH_SPAWN_CHANCE);
+
+      if (spawnNearWhitehole) {
+        // Whitehole Risk-Reward Zone:
+        // Safe distance starts beyond whitehole attraction radius (bhCharge) +
+        // safety buffer so that neither the item nor the player gets sucked in
+        // by the whitehole.
+        uint16_t minSafeDist =
+            (uint16_t)FP_TO_INT(world.bhCharge) + MONEY_BH_SAFE_BUFFER;
+
+        // Decaying distribution curve peaked at minSafeDist:
+        // min(u1, u2) produces a linearly decaying density function:
+        // 75% of items spawn in the inner half of the orbit ring!
+        uint16_t u1 = world.randomRange(0, MONEY_BH_RING_SPAN);
+        uint16_t u2 = world.randomRange(0, MONEY_BH_RING_SPAN);
+        uint16_t offset = (u1 < u2) ? u1 : u2;
+        int16_t r = (int16_t)(minSafeDist + offset);
+
+        // Sample isotropic angle from 16-point unit circle lookup table
+        uint8_t dir = world.nextRandom() & 15;
+        int16_t dx = (int16_t)(((int32_t)UNIT_CIRCLE_X[dir] * r) / 127);
+        int16_t dy = (int16_t)(((int32_t)UNIT_CIRCLE_Y[dir] * r) / 127);
+
+        wx = world.bhX + INT_TO_FP32(dx);
+        wy = world.bhY + INT_TO_FP32(dy);
+
+        // Guard: ensure not right on top of player (< 35px)
+        if (approxDistance(wx, wy, player.x, player.y) < INT_TO_FP32(35)) {
+          continue;
+        }
+
+        // Guard: ensure not out of camera despawn range
+        if (world.isTooFar(wx, wy)) {
+          continue;
+        }
+      } else {
+        // Standard flight ring around player (used for food hazards, coffee,
+        // and open-field money)
+        int16_t dist =
+            (int16_t)world.randomRange(SPAWN_MIN_DISTANCE, SPAWN_RADIUS);
+        int16_t dx = (int16_t)world.randomRange(0, dist);
+        int16_t dy = dist - dx;
+        if (world.nextRandom() & 1)
+          dx = -dx;
+        if (world.nextRandom() & 1)
+          dy = -dy;
+
+        // Bias 60% of spawns ahead in the player's movement direction
+        if ((player.vx != 0 || player.vy != 0) &&
+            (world.nextRandom() % 5 < 3)) {
+          if (player.vx > 0 && dx < 0)
+            dx = -dx;
+          if (player.vx < 0 && dx > 0)
+            dx = -dx;
+          if (player.vy > 0 && dy < 0)
+            dy = -dy;
+          if (player.vy < 0 && dy > 0)
+            dy = -dy;
+        }
+
+        wx = player.x + INT_TO_FP32(dx);
+        wy = player.y + INT_TO_FP32(dy);
+
+        // Guard: do not spawn inside the whitehole core or attraction radius
+        uint16_t minSafe = (uint16_t)FP_TO_INT(world.bhCharge) + 10;
+        if (approxDistance(wx, wy, world.bhX, world.bhY) <=
+            INT_TO_FP32(minSafe)) {
+          continue;
+        }
+      }
+
+      // Check separation against all existing active entities
+      bool tooClose = false;
+      for (uint8_t i = 0; i < MAX_ENTITIES; i++) {
         if (entities.entities[i].active) {
-            applyBlackholeGravity(entities.entities[i].x, entities.entities[i].y,
-                                   world.bhX, world.bhY,
-                                   world.bhMass, world.bhCharge, dt);
-
-            // M3: Absorb entities that fall into the whitehole core
-            if (approxDistance(entities.entities[i].x, entities.entities[i].y,
-                               world.bhX, world.bhY) < INT_TO_FP32(BH_ABSORB_RADIUS)) {
-                entities.despawn(i);
-            }
+          if (approxDistance(wx, wy, entities.entities[i].x,
+                             entities.entities[i].y) <
+              INT_TO_FP32(MIN_ITEM_SEPARATION)) {
+            tooClose = true;
+            break;
+          }
         }
+      }
+
+      if (!tooClose) {
+        entities.spawn(spawnType, wx, wy);
+        break;
+      }
     }
 
-    // 5b. Apply soft gravity pull on the player (M3: 25% of entity strength)
-    {
-        fp32_t dist = approxDistance(player.x, player.y, world.bhX, world.bhY);
-        if (dist < world.bhCharge && dist > INT_TO_FP32(BH_ABSORB_RADIUS)) {
-            fp32_t pullFactor = world.bhCharge - dist;
-            fp32_t dx = world.bhX - player.x;
-            fp32_t dy = world.bhY - player.y;
-            fp_t effMass = FP_MUL(FP_MUL(world.bhMass, BH_PLAYER_GRAVITY_SCALE), dt);
-            fp32_t moveX = (dx * (fp32_t)effMass) / dist;
-            fp32_t moveY = (dy * (fp32_t)effMass) / dist;
-            moveX = (moveX * pullFactor) / world.bhCharge;
-            moveY = (moveY * pullFactor) / world.bhCharge;
-            player.x += moveX;
-            player.y += moveY;
+    world.resetSpawnTimer();
+  }
+
+  // 5. Apply blackhole gravity to entities (M3: enabled)
+  for (uint8_t i = 0; i < MAX_ENTITIES; i++) {
+    if (entities.entities[i].active) {
+      applyBlackholeGravity(entities.entities[i].x, entities.entities[i].y,
+                            world.bhX, world.bhY, world.bhMass, world.bhCharge,
+                            dt);
+
+      // M3: Absorb entities that fall into the whitehole core (mass & charge
+      // growth)
+      if (approxDistance(entities.entities[i].x, entities.entities[i].y,
+                         world.bhX,
+                         world.bhY) < INT_TO_FP32(BH_ABSORB_RADIUS)) {
+        if (entities.entities[i].isFood()) {
+          world.bhMass += BH_FOOD_ABSORB_MASS_INC;
+        } else if (entities.entities[i].isCollectible()) {
+          world.bhCharge += BH_MONEY_ABSORB_CHARGE_INC;
         }
+        playSound(SOUND_ID_ABSORB);
+        entities.despawn(i);
+      }
     }
+  }
 
-    // 5c. Update accretion particles (M3)
-    updateParticles(dt);
+  // 5b. Apply soft gravity pull on the player (M3: 25% of entity strength)
+  {
+    fp32_t dist = approxDistance(player.x, player.y, world.bhX, world.bhY);
+    if (dist < world.bhCharge && dist > INT_TO_FP32(BH_ABSORB_RADIUS)) {
+      fp32_t pullFactor = world.bhCharge - dist;
+      fp32_t dx = world.bhX - player.x;
+      fp32_t dy = world.bhY - player.y;
+      fp_t effMass = FP_MUL(FP_MUL(world.bhMass, BH_PLAYER_GRAVITY_SCALE), dt);
+      fp32_t moveX = (dx * (fp32_t)effMass) / dist;
+      fp32_t moveY = (dy * (fp32_t)effMass) / dist;
+      moveX = (moveX * pullFactor) / world.bhCharge;
+      moveY = (moveY * pullFactor) / world.bhCharge;
+      player.x += moveX;
+      player.y += moveY;
+    }
+  }
 
-    // 6. Check player-entity collisions
-    for (uint8_t i = 0; i < MAX_ENTITIES; i++) {
-        if (!entities.entities[i].active) continue;
-        Entity& e = entities.entities[i];
-        if (checkOverlap(player.x, player.y, player.width, player.height,
-                          e.x, e.y, e.width, e.height)) {
-            if (e.isFood()) {
-                player.applyFoodSlow(e.type);
-                comboMultiplier = 1; // Food hazard interrupts combo streak
-            } else if (e.isCollectible()) {
-                uint8_t baseScore = (e.type == ENTITY_COLLECTIBLE_BILLS) ? SCORE_PER_BILLS : SCORE_PER_DIAMOND;
-                score += (uint16_t)baseScore * comboMultiplier;
-                if (comboMultiplier < COMBO_MAX) {
-                    comboMultiplier++;
-                }
-            } else if (e.isPowerup()) {
-                player.applyCoffeeBoost();
-                // Power-up also rewards combo streak
-                if (comboMultiplier < COMBO_MAX) {
-                    comboMultiplier++;
-                }
-            }
-            entities.despawn(i);
+  // 5c. Update accretion particles (M3)
+  updateParticles(dt);
+
+  // 5d. Ambient cosmic pulse (M5)
+  ambientBeatTimer++;
+  if (ambientBeatTimer >= 120) {
+    ambientBeatTimer = 0;
+    playSound(SOUND_ID_AMBIENT_BEAT);
+  }
+
+  // 6. Check player-entity collisions
+  for (uint8_t i = 0; i < MAX_ENTITIES; i++) {
+    if (!entities.entities[i].active)
+      continue;
+    Entity &e = entities.entities[i];
+    if (checkOverlap(player.x, player.y, player.width, player.height, e.x, e.y,
+                     e.width, e.height)) {
+      if (e.isFood()) {
+        player.applyFoodSlow(e.type);
+        comboMultiplier = 1; // Food hazard interrupts combo streak
+        playSound(SOUND_ID_FOOD);
+      } else if (e.isCollectible()) {
+        uint8_t baseScore = (e.type == ENTITY_COLLECTIBLE_BILLS)
+                                ? SCORE_PER_BILLS
+                                : SCORE_PER_DIAMOND;
+        score += (uint16_t)baseScore * comboMultiplier;
+        if (comboMultiplier < COMBO_MAX) {
+          comboMultiplier++;
         }
-    }
-
-    // 7. Despawn far entities
-    for (uint8_t i = 0; i < MAX_ENTITIES; i++) {
-        if (entities.entities[i].active && world.isTooFar(entities.entities[i].x, entities.entities[i].y)) {
-            entities.despawn(i);
+        playSound((e.type == ENTITY_COLLECTIBLE_BILLS) ? SOUND_ID_BILLS
+                                                       : SOUND_ID_DIAMOND);
+      } else if (e.isPowerup()) {
+        player.applyCoffeeBoost();
+        // Power-up also rewards combo streak
+        if (comboMultiplier < COMBO_MAX) {
+          comboMultiplier++;
         }
+        playSound(SOUND_ID_BOOST);
+      }
+      entities.despawn(i);
     }
+  }
 
-    // 8. Passive score
-    if (world.shouldScoreTick()) {
-        score += SCORE_PER_TICK;
-        world.resetScoreTimer();
+  // 7. Despawn far entities
+  for (uint8_t i = 0; i < MAX_ENTITIES; i++) {
+    if (entities.entities[i].active &&
+        world.isTooFar(entities.entities[i].x, entities.entities[i].y)) {
+      entities.despawn(i);
     }
+  }
 
-    // 9. Check game over (blackhole catches player)
-    if (checkOverlap(player.x, player.y, player.width, player.height,
-                      world.bhX, world.bhY,
-                      BH_RENDER_RADIUS * 2, BH_RENDER_RADIUS * 2)) {
-        state = STATE_GAMEOVER;
-        gameOverCooldown = GAMEOVER_COOLDOWN_FRAMES;
-        if (score > highScore) {
-            highScore = score;
-            if (storageRef) {
-                storageRef->saveHighScore(highScore);
-            }
-        }
+  // 8. Passive score
+  if (world.shouldScoreTick()) {
+    score += SCORE_PER_TICK;
+    world.resetScoreTimer();
+  }
+
+  // 9. Check game over (blackhole catches player)
+  if (checkOverlap(player.x, player.y, player.width, player.height, world.bhX,
+                   world.bhY, BH_RENDER_RADIUS * 2, BH_RENDER_RADIUS * 2)) {
+    state = STATE_GAMEOVER;
+    gameOverCooldown = GAMEOVER_COOLDOWN_FRAMES;
+    playSound(SOUND_ID_GAMEOVER);
+    if (score > highScore) {
+      highScore = score;
+      if (storageRef) {
+        storageRef->saveHighScore(highScore);
+      }
     }
+  }
 }
 
-void Game::renderPlaying(HalRenderer& renderer) {
-    // Draw order: back → front (painter's algorithm)
-    renderBackground(renderer);
-    renderEntities(renderer);
-    renderBlackhole(renderer);
-    renderParticles(renderer);  // M3: accretion disk particles
-    renderPlayer(renderer);
-    renderHUD(renderer);
+void Game::renderPlaying(HalRenderer &renderer) {
+  // Draw order: back → front (painter's algorithm)
+  renderBackground(renderer);
+  renderEntities(renderer);
+  renderBlackhole(renderer);
+  renderParticles(renderer); // M3: accretion disk particles
+  renderPlayer(renderer);
+  renderHUD(renderer);
 }
 
 // =============================================================================
 // STATE: GAME OVER
 // =============================================================================
 
-void Game::updateGameOver(HalInput& input, fp_t dt) {
-    (void)dt;
-    if (gameOverCooldown > 0) {
-        gameOverCooldown--;
-        return;
-    }
-    if (input.justPressed(BTN_A)) {
-        state = STATE_TITLE;
-    } else if (input.justPressed(BTN_B)) {
-        reset();
-        state = STATE_PLAYING;
-    }
+void Game::updateGameOver(HalInput &input, fp_t dt) {
+  (void)dt;
+  if (gameOverCooldown > 0) {
+    gameOverCooldown--;
+    return;
+  }
+  if (input.justPressed(BTN_A)) {
+    playSound(SOUND_ID_MENU);
+    state = STATE_TITLE;
+  } else if (input.justPressed(BTN_B)) {
+    playSound(SOUND_ID_MENU);
+    reset();
+    state = STATE_PLAYING;
+  }
 }
 
-void Game::renderGameOver(HalRenderer& renderer) {
-    // During cooldown, show title and scores without button prompts
-    // Prevents accidental menu selection from residual sprint-tapping
-    if (gameOverCooldown > 0) {
-        renderer.setCursor(37, 8);
-        renderer.print("GAME OVER");
-        renderer.setCursor(22, 24);
-        renderer.print("Score:");
-        renderer.printNumber(score);
-        renderer.setCursor(22, 36);
-        renderer.print("High:");
-        renderer.printNumber(highScore);
-        return;
+void Game::renderGameOver(HalRenderer &renderer) {
+  // 1. Sleek double-line arcade cabinet frame (120x60 in 128x64 display)
+  renderer.drawRect(4, 2, 120, 60, COLOR_WHITE);
+  renderer.drawRect(6, 4, 116, 56, COLOR_WHITE);
+
+  // 2. "GAME OVER" header (9 chars × 6px = 54px → centered at x = 37, y = 7)
+  renderer.setCursor(37, 7);
+  renderer.print("GAME OVER");
+
+  // 3. Horizontal separator line
+  renderer.drawLine(10, 16, 117, 16, COLOR_WHITE);
+
+  // 4. Formatted statistics panel with dollar signs
+  // Line 1: SCORE
+  renderer.setCursor(11, 19);
+  renderer.print("SCORE:    $");
+  renderer.printNumber(score);
+
+  // New High Score celebratory badge
+  if (score > 0 && score >= highScore) {
+    if ((world.bhSpin % 24) < 14) {
+      renderer.setCursor(46, 19);
+      renderer.print("[N]");
     }
+  }
 
-    // "GAME OVER" — 9 chars × 6px = 54px → x = (128-54)/2 = 37
-    renderer.setCursor(37, 8);
-    renderer.print("GAME OVER");
+  // Line 2: RECORD / HIGH SCORE
+  renderer.setCursor(10, 29);
+  renderer.print("RECORD:   $");
+  renderer.printNumber(highScore);
 
-    renderer.setCursor(22, 24);
-    renderer.print("Score:");
-    renderer.printNumber(score);
+  // Line 3: SURVIVAL TIME
+  renderer.setCursor(10, 39);
+  renderer.print("SURVIVED: ");
+  renderer.printNumber(world.gameTime / TARGET_FPS);
+  renderer.print("s");
 
-    renderer.setCursor(22, 36);
-    renderer.print("High:");
-    renderer.printNumber(highScore);
-
-    // "A:Menu B:Retry" — 14 chars × 6px = 84px → x = (128-84)/2 = 22
-    renderer.setCursor(22, 52);
-    renderer.print("A:Menu B:Retry");
+  // 5. Bottom action prompt (with cooldown lock visual feedback)
+  if (gameOverCooldown > 0) {
+    renderer.setCursor(18, 50);
+    renderer.print("CONGRATULATIONS!");
+  } else {
+    renderer.setCursor(12, 50);
+    renderer.print("[A]Menu  [B]Retry");
+  }
 }
 
 // =============================================================================
 // RENDER COMPONENTS
 // =============================================================================
 
-void Game::renderBackground(HalRenderer& renderer) {
-    // =========================================================================
-    // Pseudo-3D Perspective Ground Grid with Spacetime Curvature (M4)
-    // =========================================================================
-    // The vanishing point (HORIZON_Y) is above the screen, so the entire
-    // 128×64 display is ground plane. Grid lines are distorted toward the
-    // whitehole position, creating a gravitational lensing / spacetime
-    // curvature visual effect. Distortion scales with bhCharge over time.
+void Game::renderBackground(HalRenderer &renderer) {
+  // =========================================================================
+  // Pseudo-3D Perspective Ground Grid with Spacetime Curvature (M4)
+  // =========================================================================
+  // The vanishing point (HORIZON_Y) is above the screen, so the entire
+  // 128×64 display is ground plane. Grid lines are distorted toward the
+  // whitehole position, creating a gravitational lensing / spacetime
+  // curvature visual effect. Distortion scales with bhCharge over time.
 
-    // 1. Horizon line (only drawn if vanishing point is on-screen)
-    if (HORIZON_Y >= 0) {
-        renderer.drawLine(0, HORIZON_Y, SCREEN_W - 1, HORIZON_Y, COLOR_WHITE);
+  // 1. Horizon line (only drawn if vanishing point is on-screen)
+  if (HORIZON_Y >= 0) {
+    renderer.drawLine(0, HORIZON_Y, SCREEN_W - 1, HORIZON_Y, COLOR_WHITE);
+  }
+
+  // 2. Compute whitehole screen position for grid distortion (M4)
+  int16_t bhSX = world.worldToScreenX(world.bhX, world.bhY);
+  int16_t bhSY = world.worldToScreenY(world.bhY);
+
+  // Distortion strength scales with bhCharge (grows over time)
+  // Visible from the start but subtle — DIVISOR keeps initial values low
+  int16_t distortStrength =
+      (int16_t)(FP_TO_INT(world.bhCharge) / GRID_DISTORT_DIVISOR);
+  if (distortStrength > GRID_DISTORT_MAX_STRENGTH) {
+    distortStrength = GRID_DISTORT_MAX_STRENGTH;
+  }
+  int16_t distortRadiusSq = (int16_t)GRID_DISTORT_RADIUS * GRID_DISTORT_RADIUS;
+
+  // 3. Perspective rays converging toward vanishing point (scrolling with camX)
+  //    M4: Ray endpoints are distorted toward the whitehole (gravitational
+  //    lensing)
+  int16_t camX_int = (int16_t)FP32_TO_INT(world.camX);
+  int16_t xOffset = camX_int % BASE_SPACING_X;
+  if (xOffset < 0)
+    xOffset += BASE_SPACING_X;
+
+  for (int16_t bx = -xOffset - BASE_SPACING_X * 2;
+       bx <= SCREEN_W + BASE_SPACING_X * 2; bx += BASE_SPACING_X) {
+
+    int16_t tx = (SCREEN_W / 2) +
+                 ((bx - (SCREEN_W / 2)) * TOP_SPACING_X) / BASE_SPACING_X;
+
+    // M4: Draw segmented vertical perspective ray with full 2D spacetime
+    // curvature
+    int16_t prevX, prevY;
+    applyGridDistortion2D(tx, 0, bhSX, bhSY, distortStrength, distortRadiusSq,
+                          prevX, prevY);
+
+    for (uint8_t seg = 1; seg <= GRID_VSEG_COUNT; seg++) {
+      int16_t curY = (seg == GRID_VSEG_COUNT)
+                         ? (SCREEN_H - 1)
+                         : (int16_t)((seg * (SCREEN_H - 1)) / GRID_VSEG_COUNT);
+      int16_t curX = tx + (int16_t)(((int32_t)(bx - tx) * (curY - HORIZON_Y)) /
+                                    (SCREEN_H - 1 - HORIZON_Y));
+
+      int16_t outX, outY;
+      applyGridDistortion2D(curX, curY, bhSX, bhSY, distortStrength,
+                            distortRadiusSq, outX, outY);
+
+      renderer.drawLine(prevX, prevY, outX, outY, COLOR_WHITE);
+      prevX = outX;
+      prevY = outY;
     }
+  }
 
-    // 2. Compute whitehole screen position for grid distortion (M4)
-    int16_t bhSX = world.worldToScreenX(world.bhX, world.bhY);
-    int16_t bhSY = world.worldToScreenY(world.bhY);
+  // 4. Quadratic foreshortened depth lines (scrolling with camY)
+  //    M4: Drawn as segmented polylines with per-segment 2D distortion toward
+  //    whitehole
+  int16_t camY_int = (int16_t)FP32_TO_INT(world.camY);
+  int16_t zOffset = camY_int % Z_PERIOD;
+  if (zOffset < 0)
+    zOffset += Z_PERIOD;
 
-    // Distortion strength scales with bhCharge (grows over time)
-    // Visible from the start but subtle — DIVISOR keeps initial values low
-    int16_t distortStrength = (int16_t)(FP_TO_INT(world.bhCharge) / GRID_DISTORT_DIVISOR);
-    if (distortStrength > GRID_DISTORT_MAX_STRENGTH) {
-        distortStrength = GRID_DISTORT_MAX_STRENGTH;
+  int16_t segW = SCREEN_W / GRID_HSEG_COUNT;
+
+  for (int16_t z = Z_PERIOD - zOffset; z <= PERSPECTIVE_MAX_Z; z += Z_PERIOD) {
+    int32_t z32 = z;
+    int16_t yLine = HORIZON_Y + (int16_t)(((int32_t)GROUND_HEIGHT * z32 * z32) /
+                                          PERSPECTIVE_MAX_Z_SQ);
+    if (yLine <= 0 || yLine >= SCREEN_H)
+      continue;
+
+    // Draw distorted horizontal line as segmented polyline with 2D distortion
+    int16_t prevX, prevY;
+    applyGridDistortion2D(0, yLine, bhSX, bhSY, distortStrength,
+                          distortRadiusSq, prevX, prevY);
+
+    for (uint8_t s = 1; s <= GRID_HSEG_COUNT; s++) {
+      int16_t cx = (s == GRID_HSEG_COUNT) ? (SCREEN_W - 1) : (s * segW);
+      int16_t cy = yLine;
+
+      int16_t outX, outY;
+      applyGridDistortion2D(cx, cy, bhSX, bhSY, distortStrength,
+                            distortRadiusSq, outX, outY);
+
+      renderer.drawLine(prevX, prevY, outX, outY, COLOR_WHITE);
+      prevX = outX;
+      prevY = outY;
     }
-    int16_t distortRadiusSq = (int16_t)GRID_DISTORT_RADIUS * GRID_DISTORT_RADIUS;
-
-    // 3. Perspective rays converging toward vanishing point (scrolling with camX)
-    //    M4: Ray endpoints are distorted toward the whitehole (gravitational lensing)
-    int16_t camX_int = (int16_t)FP32_TO_INT(world.camX);
-    int16_t xOffset = camX_int % BASE_SPACING_X;
-    if (xOffset < 0) xOffset += BASE_SPACING_X;
-
-    for (int16_t bx = -xOffset - BASE_SPACING_X * 2;
-         bx <= SCREEN_W + BASE_SPACING_X * 2;
-         bx += BASE_SPACING_X) {
-
-        int16_t tx = (SCREEN_W / 2) + ((bx - (SCREEN_W / 2)) * TOP_SPACING_X) / BASE_SPACING_X;
-
-        // M4: Bend top and bottom endpoints toward whitehole
-        int16_t txD = applyGridDistortion(tx, HORIZON_Y, bhSX, bhSY, distortStrength, distortRadiusSq);
-        int16_t bxD = applyGridDistortion(bx, SCREEN_H - 1, bhSX, bhSY, distortStrength, distortRadiusSq);
-
-        renderer.drawLine(txD, HORIZON_Y, bxD, SCREEN_H - 1, COLOR_WHITE);
-    }
-
-    // 4. Quadratic foreshortened depth lines (scrolling with camY)
-    //    M4: Drawn as segmented polylines with per-segment distortion toward whitehole
-    int16_t camY_int = (int16_t)FP32_TO_INT(world.camY);
-    int16_t zOffset = camY_int % Z_PERIOD;
-    if (zOffset < 0) zOffset += Z_PERIOD;
-
-    int16_t segW = SCREEN_W / GRID_HSEG_COUNT;
-
-    for (int16_t z = Z_PERIOD - zOffset; z <= PERSPECTIVE_MAX_Z; z += Z_PERIOD) {
-        int32_t z32 = z;
-        int16_t yLine = HORIZON_Y + (int16_t)(((int32_t)GROUND_HEIGHT * z32 * z32) / PERSPECTIVE_MAX_Z_SQ);
-        if (yLine <= 0 || yLine >= SCREEN_H) continue;
-
-        // Draw distorted horizontal line as segmented polyline
-        int16_t prevX = 0;
-        int16_t prevY = yLine;
-
-        for (uint8_t s = 1; s <= GRID_HSEG_COUNT; s++) {
-            int16_t cx = (s == GRID_HSEG_COUNT) ? (SCREEN_W - 1) : (s * segW);
-            int16_t cy = yLine;
-
-            // Distort this control point toward whitehole
-            int16_t dxBh = cx - bhSX;
-            int16_t dyBh = cy - bhSY;
-            int32_t d2 = (int32_t)dxBh * dxBh + (int32_t)dyBh * dyBh;
-
-            if (d2 > 0 && d2 < (int32_t)distortRadiusSq) {
-                // Linear falloff: stronger distortion closer to whitehole
-                int32_t factor = (int32_t)distortRadiusSq - d2;
-                int16_t shiftX = (int16_t)(((int32_t)(-dxBh) * distortStrength * factor) /
-                                           ((int32_t)distortRadiusSq * 64));
-                int16_t shiftY = (int16_t)(((int32_t)(-dyBh) * distortStrength * factor) /
-                                           ((int32_t)distortRadiusSq * 64));
-                cx += shiftX;
-                cy += shiftY;
-            }
-
-            renderer.drawLine(prevX, prevY, cx, cy, COLOR_WHITE);
-            prevX = cx;
-            prevY = cy;
-        }
-    }
+  }
 }
 
-void Game::drawSpriteWithConfig(HalRenderer& renderer, int16_t x, int16_t y,
-                                const uint8_t* bitmap, const uint8_t* mask,
-                                const uint8_t* outline, uint8_t frame,
+void Game::drawSpriteWithConfig(HalRenderer &renderer, int16_t x, int16_t y,
+                                const uint8_t *bitmap, const uint8_t *mask,
+                                const uint8_t *outline, uint8_t frame,
                                 SpriteAlphaMode alphaMode,
                                 SpriteOutlineMode outlineMode) {
-    if (alphaMode == SPRITE_ALPHA_TRANSPARENT) {
-        // Native transparent sprite: white pixels drawn, 0-bits untouched
-        renderer.drawSelfMasked(x, y, bitmap, frame);
-        return;
+  if (alphaMode == SPRITE_ALPHA_TRANSPARENT) {
+    // Native transparent sprite: white pixels drawn, 0-bits untouched
+    renderer.drawSelfMasked(x, y, bitmap, frame);
+    return;
+  }
+
+  // Opaque background mode (solid black background behind sprite)
+  switch (outlineMode) {
+  case SPRITE_OUTLINE_BLACK:
+    // 1. Erase dilated outline footprint to BLACK (erases background grid
+    // lines)
+    if (outline != nullptr) {
+      renderer.drawErase(x, y, outline, frame);
+    } else if (mask != nullptr) {
+      renderer.drawErase(x, y, mask, frame);
     }
+    // 2. Draw white bitmap art pixels on top
+    renderer.drawSelfMasked(x, y, bitmap, frame);
+    break;
 
-    // Opaque background mode (solid black background behind sprite)
-    switch (outlineMode) {
-        case SPRITE_OUTLINE_BLACK:
-            // 1. Erase dilated outline footprint to BLACK (erases background grid lines)
-            if (outline != nullptr) {
-                renderer.drawErase(x, y, outline, frame);
-            } else if (mask != nullptr) {
-                renderer.drawErase(x, y, mask, frame);
-            }
-            // 2. Draw white bitmap art pixels on top
-            renderer.drawSelfMasked(x, y, bitmap, frame);
-            break;
-
-        case SPRITE_OUTLINE_WHITE:
-            // 1. Draw dilated outline footprint in WHITE
-            if (outline != nullptr) {
-                renderer.drawSelfMasked(x, y, outline, frame);
-            }
-            // 2. Erase interior mask to BLACK and draw white bitmap art
-            if (mask != nullptr) {
-                renderer.drawExternalMask(x, y, bitmap, mask, frame, frame);
-            } else {
-                renderer.drawSelfMasked(x, y, bitmap, frame);
-            }
-            break;
-
-        case SPRITE_OUTLINE_NONE:
-        default:
-            // Solid black interior background, no extra outline border
-            if (mask != nullptr) {
-                renderer.drawExternalMask(x, y, bitmap, mask, frame, frame);
-            } else {
-                renderer.drawSelfMasked(x, y, bitmap, frame);
-            }
-            break;
+  case SPRITE_OUTLINE_WHITE:
+    // 1. Draw dilated outline footprint in WHITE
+    if (outline != nullptr) {
+      renderer.drawSelfMasked(x, y, outline, frame);
     }
+    // 2. Erase interior mask to BLACK and draw white bitmap art
+    if (mask != nullptr) {
+      renderer.drawExternalMask(x, y, bitmap, mask, frame, frame);
+    } else {
+      renderer.drawSelfMasked(x, y, bitmap, frame);
+    }
+    break;
+
+  case SPRITE_OUTLINE_NONE:
+  default:
+    // Solid black interior background, no extra outline border
+    if (mask != nullptr) {
+      renderer.drawExternalMask(x, y, bitmap, mask, frame, frame);
+    } else {
+      renderer.drawSelfMasked(x, y, bitmap, frame);
+    }
+    break;
+  }
 }
 
-void Game::renderEntities(HalRenderer& renderer) {
-    for (uint8_t i = 0; i < MAX_ENTITIES; i++) {
-        const Entity& e = entities.entities[i];
-        if (!e.active) continue;
+void Game::renderEntities(HalRenderer &renderer) {
+  for (uint8_t i = 0; i < MAX_ENTITIES; i++) {
+    const Entity &e = entities.entities[i];
+    if (!e.active)
+      continue;
 
-        // Project entity onto perspective ground grid
-        int16_t sx = world.worldToScreenX(e.x, e.y);
-        int16_t sy = world.worldToScreenY(e.y);
+    // Project entity onto perspective ground grid
+    int16_t sx = world.worldToScreenX(e.x, e.y);
+    int16_t sy = world.worldToScreenY(e.y);
 
-        // Skip if completely off-screen
-        if (sx < -ITEM_SPRITE_WIDTH || sx > SCREEN_W + ITEM_SPRITE_WIDTH ||
-            sy < -ITEM_SPRITE_HEIGHT || sy > SCREEN_H + ITEM_SPRITE_HEIGHT) {
-            continue;
-        }
-
-        uint8_t frame = 0;
-        switch (e.type) {
-            case ENTITY_FOOD_APPLE:
-                frame = SPRITE_ITEM_APPLE;
-                break;
-            case ENTITY_FOOD_PIZZA:
-                frame = SPRITE_ITEM_PIZZA;
-                break;
-            case ENTITY_FOOD_TACO:
-                frame = SPRITE_ITEM_TACO;
-                break;
-            case ENTITY_FOOD_BURGER:
-                frame = SPRITE_ITEM_BURGER;
-                break;
-            case ENTITY_FOOD_FRIES:
-                frame = SPRITE_ITEM_FRIES;
-                break;
-            case ENTITY_FOOD_CAKE:
-                frame = SPRITE_ITEM_CAKE;
-                break;
-            case ENTITY_FOOD_DONUT:
-                frame = SPRITE_ITEM_DONUT;
-                break;
-            case ENTITY_FOOD_ICECREAM:
-                frame = SPRITE_ITEM_ICECREAM;
-                break;
-            case ENTITY_COLLECTIBLE_DIAMOND:
-                frame = SPRITE_ITEM_DIAMOND;
-                break;
-            case ENTITY_COLLECTIBLE_BILLS:
-                frame = SPRITE_ITEM_BILLS;
-                break;
-            case ENTITY_POWERUP_COFFEE:
-                frame = SPRITE_ITEM_COFFEE;
-                break;
-            default:
-                continue;
-        }
-
-        drawSpriteWithConfig(renderer,
-                             sx - (ITEM_SPRITE_WIDTH / 2),
-                             sy - (ITEM_SPRITE_HEIGHT / 2),
-                             items_sprites, items_masks, items_outlines, frame,
-                             ENTITY_ALPHA_MODE, ENTITY_OUTLINE_MODE);
+    // Skip if completely off-screen
+    if (sx < -ITEM_SPRITE_WIDTH || sx > SCREEN_W + ITEM_SPRITE_WIDTH ||
+        sy < -ITEM_SPRITE_HEIGHT || sy > SCREEN_H + ITEM_SPRITE_HEIGHT) {
+      continue;
     }
+
+    uint8_t frame = 0;
+    switch (e.type) {
+    case ENTITY_FOOD_APPLE:
+      frame = SPRITE_ITEM_APPLE;
+      break;
+    case ENTITY_FOOD_PIZZA:
+      frame = SPRITE_ITEM_PIZZA;
+      break;
+    case ENTITY_FOOD_TACO:
+      frame = SPRITE_ITEM_TACO;
+      break;
+    case ENTITY_FOOD_BURGER:
+      frame = SPRITE_ITEM_BURGER;
+      break;
+    case ENTITY_FOOD_FRIES:
+      frame = SPRITE_ITEM_FRIES;
+      break;
+    case ENTITY_FOOD_CAKE:
+      frame = SPRITE_ITEM_CAKE;
+      break;
+    case ENTITY_FOOD_DONUT:
+      frame = SPRITE_ITEM_DONUT;
+      break;
+    case ENTITY_FOOD_ICECREAM:
+      frame = SPRITE_ITEM_ICECREAM;
+      break;
+    case ENTITY_COLLECTIBLE_DIAMOND:
+      frame = SPRITE_ITEM_DIAMOND;
+      break;
+    case ENTITY_COLLECTIBLE_BILLS:
+      frame = SPRITE_ITEM_BILLS;
+      break;
+    case ENTITY_POWERUP_COFFEE:
+      frame = SPRITE_ITEM_COFFEE;
+      break;
+    default:
+      continue;
+    }
+
+    drawSpriteWithConfig(renderer, sx - (ITEM_SPRITE_WIDTH / 2),
+                         sy - (ITEM_SPRITE_HEIGHT / 2), items_sprites,
+                         items_masks, items_outlines, frame, ENTITY_ALPHA_MODE,
+                         ENTITY_OUTLINE_MODE);
+  }
 }
 
-void Game::renderPlayer(HalRenderer& renderer) {
-    // Player position on perspective ground plane
-    int16_t sx = world.worldToScreenX(player.x, player.y);
-    int16_t sy = world.worldToScreenY(player.y);
+void Game::renderPlayer(HalRenderer &renderer) {
+  // Player position on perspective ground plane
+  int16_t sx = world.worldToScreenX(player.x, player.y);
+  int16_t sy = world.worldToScreenY(player.y);
 
-    // Speed boost visual effect: motion trail particles behind movement vector
-    if (player.isBoosted() && (player.vx != 0 || player.vy != 0)) {
-        int16_t trailX = sx - FP_TO_INT(player.vx * 3);
-        int16_t trailY = sy - FP_TO_INT(player.vy * 3);
-        if ((world.gameTime % 2) == 0) {
-            renderer.drawPixel(trailX - 2, trailY, COLOR_WHITE);
-            renderer.drawPixel(trailX + 2, trailY, COLOR_WHITE);
-            renderer.drawPixel(trailX, trailY - 2, COLOR_WHITE);
-        }
+  // Speed boost visual effect: motion trail particles behind movement vector
+  if (player.isBoosted() && (player.vx != 0 || player.vy != 0)) {
+    int16_t trailX = sx - FP_TO_INT(player.vx * 3);
+    int16_t trailY = sy - FP_TO_INT(player.vy * 3);
+    if ((world.gameTime % 2) == 0) {
+      renderer.drawPixel(trailX - 2, trailY, COLOR_WHITE);
+      renderer.drawPixel(trailX + 2, trailY, COLOR_WHITE);
+      renderer.drawPixel(trailX, trailY - 2, COLOR_WHITE);
     }
+  }
 
-    // Sprint visual effect: extra motion trail particles
-    if (player.getCurrentMoveTier() == MOVE_SPRINT && (player.vx != 0 || player.vy != 0)) {
-        int16_t trailX = sx - FP_TO_INT(player.vx * 5);
-        int16_t trailY = sy - FP_TO_INT(player.vy * 5);
-        if ((world.gameTime % 2) == 0) {
-            renderer.drawPixel(trailX - 3, trailY - 1, COLOR_WHITE);
-            renderer.drawPixel(trailX + 3, trailY + 1, COLOR_WHITE);
-            renderer.drawPixel(trailX - 1, trailY - 3, COLOR_WHITE);
-            renderer.drawPixel(trailX + 1, trailY + 3, COLOR_WHITE);
-        }
+  // Sprint visual effect: extra motion trail particles
+  if (player.getCurrentMoveTier() == MOVE_SPRINT &&
+      (player.vx != 0 || player.vy != 0)) {
+    int16_t trailX = sx - FP_TO_INT(player.vx * 5);
+    int16_t trailY = sy - FP_TO_INT(player.vy * 5);
+    if ((world.gameTime % 2) == 0) {
+      renderer.drawPixel(trailX - 3, trailY - 1, COLOR_WHITE);
+      renderer.drawPixel(trailX + 3, trailY + 1, COLOR_WHITE);
+      renderer.drawPixel(trailX - 1, trailY - 3, COLOR_WHITE);
+      renderer.drawPixel(trailX + 1, trailY + 3, COLOR_WHITE);
     }
+  }
 
-    // Visual feedback for slow debuff: blink (slower cadence)
-    if (!player.isSlowed() || ((player.slowTimer / PLAYER_BLINK_DIVISOR) % 2 == 0)) {
-        uint8_t playerFrame = player.facingDir + (player.walkFrame * 8);
-        drawSpriteWithConfig(renderer,
-                             sx - (PLAYER_SPRITE_WIDTH / 2),
-                             sy - (PLAYER_SPRITE_HEIGHT / 2),
-                             player_sprite, player_mask, player_outline, playerFrame,
-                             PLAYER_ALPHA_MODE, PLAYER_OUTLINE_MODE);
-    }
+  // Visual feedback for slow debuff: blink (slower cadence)
+  if (!player.isSlowed() ||
+      ((player.slowTimer / PLAYER_BLINK_DIVISOR) % 2 == 0)) {
+    uint8_t playerFrame = player.facingDir + (player.walkFrame * 8);
+    drawSpriteWithConfig(renderer, sx - (PLAYER_SPRITE_WIDTH / 2),
+                         sy - (PLAYER_SPRITE_HEIGHT / 2), player_sprite,
+                         player_mask, player_outline, playerFrame,
+                         PLAYER_ALPHA_MODE, PLAYER_OUTLINE_MODE);
+  }
 }
 
-void Game::renderBlackhole(HalRenderer& renderer) {
-    // Project whitehole/blackhole onto perspective ground grid
-    int16_t sx = world.worldToScreenX(world.bhX, world.bhY);
-    int16_t sy = world.worldToScreenY(world.bhY);
+void Game::renderBlackhole(HalRenderer &renderer) {
+  // Project whitehole/blackhole onto perspective ground grid
+  int16_t sx = world.worldToScreenX(world.bhX, world.bhY);
+  int16_t sy = world.worldToScreenY(world.bhY);
 
-    // Skip drawing if completely off-screen
-    if (sx < -WHITEHOLE_SPRITE_WIDTH || sx > SCREEN_W + WHITEHOLE_SPRITE_WIDTH ||
-        sy < -WHITEHOLE_SPRITE_HEIGHT || sy > SCREEN_H + WHITEHOLE_SPRITE_HEIGHT) {
-        return;
-    }
+  // Skip drawing if completely off-screen
+  if (sx < -WHITEHOLE_SPRITE_WIDTH || sx > SCREEN_W + WHITEHOLE_SPRITE_WIDTH ||
+      sy < -WHITEHOLE_SPRITE_HEIGHT ||
+      sy > SCREEN_H + WHITEHOLE_SPRITE_HEIGHT) {
+    return;
+  }
 
-    // Animate swirling whitehole frames based on bhSpin (slower, majestic)
-    uint8_t frame = (world.bhSpin / WHITEHOLE_ANIM_DIVISOR) % WHITEHOLE_FRAME_COUNT;
-    drawSpriteWithConfig(renderer,
-                         sx - (WHITEHOLE_SPRITE_WIDTH / 2),
-                         sy - (WHITEHOLE_SPRITE_HEIGHT / 2),
-                         whitehole_sprite, whitehole_mask, nullptr, frame,
-                         WHITEHOLE_ALPHA_MODE, WHITEHOLE_OUTLINE_MODE);
+  // Animate swirling whitehole frames based on bhSpin (slower, majestic)
+  uint8_t frame =
+      (world.bhSpin / WHITEHOLE_ANIM_DIVISOR) % WHITEHOLE_FRAME_COUNT;
+  drawSpriteWithConfig(renderer, sx - (WHITEHOLE_SPRITE_WIDTH / 2),
+                       sy - (WHITEHOLE_SPRITE_HEIGHT / 2), whitehole_sprite,
+                       whitehole_mask, nullptr, frame, WHITEHOLE_ALPHA_MODE,
+                       WHITEHOLE_OUTLINE_MODE);
 }
 
-void Game::renderHUD(HalRenderer& renderer) {
-    // Configurable HUD position with black backing for readability over grid
-    static const uint8_t HUD_PAD   = 2;    // Padding from screen edge
-    static const uint8_t HUD_BG_W  = 42;   // Background width (fits score + combo multiplier)
-    static const uint8_t HUD_BG_H  = 12;   // Background height (font 8px + 4px padding)
+void Game::renderHUD(HalRenderer &renderer) {
+  // Configurable HUD position with black backing for readability over grid
+  static const uint8_t HUD_PAD = 2; // Padding from screen edge
+  static const uint8_t HUD_BG_W =
+      54; // Background width (generous fits $, 5 digits, combo)
+  static const uint8_t HUD_BG_H =
+      12; // Background height (font 8px + 4px padding)
 
-    int16_t hudX, hudY;
-    switch (HUD_POSITION) {
-        case HUD_TOP_LEFT:     hudX = HUD_PAD;                        hudY = HUD_PAD; break;
-        case HUD_BOTTOM_LEFT:  hudX = HUD_PAD;                        hudY = SCREEN_H - HUD_BG_H - HUD_PAD + 1; break;
-        case HUD_BOTTOM_RIGHT: hudX = SCREEN_W - HUD_BG_W - HUD_PAD;  hudY = SCREEN_H - HUD_BG_H - HUD_PAD + 1; break;
-        case HUD_TOP_RIGHT:
-        default:               hudX = SCREEN_W - HUD_BG_W - HUD_PAD;  hudY = HUD_PAD; break;
+  int16_t hudX, hudY;
+  switch (HUD_POSITION) {
+  case HUD_TOP_LEFT:
+    hudX = HUD_PAD;
+    hudY = HUD_PAD;
+    break;
+  case HUD_BOTTOM_LEFT:
+    hudX = HUD_PAD;
+    hudY = SCREEN_H - HUD_BG_H - HUD_PAD + 1;
+    break;
+  case HUD_BOTTOM_RIGHT:
+    hudX = SCREEN_W - HUD_BG_W - HUD_PAD;
+    hudY = SCREEN_H - HUD_BG_H - HUD_PAD + 1;
+    break;
+  case HUD_TOP_RIGHT:
+  default:
+    hudX = SCREEN_W - HUD_BG_W - HUD_PAD;
+    hudY = HUD_PAD;
+    break;
+  }
+
+  // Black background rectangle for readability over grid lines
+  renderer.fillRect(hudX, hudY, HUD_BG_W, HUD_BG_H, COLOR_BLACK);
+  // White border line outline
+  renderer.drawRect(hudX, hudY, HUD_BG_W, HUD_BG_H, COLOR_WHITE);
+
+  // Draw score text with dollar sign
+  renderer.setCursor(hudX + 3, hudY + 2);
+  renderer.print("$");
+  renderer.printNumber(score);
+
+  // Show combo multiplier
+  if (comboMultiplier > 1) {
+    renderer.print("x");
+    renderer.printNumber(comboMultiplier);
+  }
+
+  // Active status badges (Turbo Boost or Food Slow debuff)
+  if (player.isBoosted()) {
+    renderer.fillRect(2, 2, 38, 9, COLOR_BLACK);
+    renderer.drawRect(2, 2, 38, 9, COLOR_WHITE);
+    renderer.setCursor(5, 3);
+    renderer.print("BOOST");
+  } else if (player.isSlowed()) {
+    if ((player.slowTimer / 8) % 2 == 0) {
+      renderer.fillRect(2, 2, 32, 9, COLOR_BLACK);
+      renderer.drawRect(2, 2, 32, 9, COLOR_WHITE);
+      renderer.setCursor(5, 3);
+      renderer.print("SLOW");
     }
+  }
 
-    // Black background rectangle for readability over grid lines
-    renderer.fillRect(hudX, hudY, HUD_BG_W, HUD_BG_H, COLOR_BLACK);
-    // White border line outline
-    renderer.drawRect(hudX, hudY, HUD_BG_W, HUD_BG_H, COLOR_WHITE);
-    
-    // Draw score text centered vertically within the box
-    renderer.setCursor(hudX + 3, hudY + 2);
-    renderer.printNumber(score);
+  // === STAMINA BAR (vertical, right edge) ===
+  // Outer border
+  renderer.drawRect(STAMINA_BAR_X, STAMINA_BAR_Y, STAMINA_BAR_WIDTH,
+                    STAMINA_BAR_HEIGHT, COLOR_WHITE);
+  // Top and bottom end caps for crisp visual finish
+  renderer.drawLine(STAMINA_BAR_X - 1, STAMINA_BAR_Y,
+                    STAMINA_BAR_X + STAMINA_BAR_WIDTH, STAMINA_BAR_Y,
+                    COLOR_WHITE);
+  renderer.drawLine(STAMINA_BAR_X - 1, STAMINA_BAR_Y + STAMINA_BAR_HEIGHT - 1,
+                    STAMINA_BAR_X + STAMINA_BAR_WIDTH,
+                    STAMINA_BAR_Y + STAMINA_BAR_HEIGHT - 1, COLOR_WHITE);
 
-    // Show combo multiplier or boost indicator
-    if (comboMultiplier > 1) {
-        renderer.print("x");
-        renderer.printNumber(comboMultiplier);
-    } else if (player.isBoosted()) {
-        renderer.print(" !");
-    }
+  // Inner fill (bottom-up, proportional to current stamina)
+  uint8_t fillHeight =
+      (uint8_t)(((uint16_t)player.stamina * (STAMINA_BAR_HEIGHT - 2)) /
+                STAMINA_MAX);
+  if (fillHeight > 0) {
+    int16_t fillY = STAMINA_BAR_Y + (STAMINA_BAR_HEIGHT - 1) - fillHeight;
+    renderer.fillRect(STAMINA_BAR_X + 1, fillY, STAMINA_BAR_WIDTH - 2,
+                      fillHeight, COLOR_WHITE);
+  }
 
-    // === STAMINA BAR (vertical, right edge) ===
-    // Outer border
-    renderer.drawRect(STAMINA_BAR_X, STAMINA_BAR_Y,
-                      STAMINA_BAR_WIDTH, STAMINA_BAR_HEIGHT, COLOR_WHITE);
-
-    // Inner fill (bottom-up, proportional to current stamina)
-    uint8_t fillHeight = (uint8_t)(((uint16_t)player.stamina * (STAMINA_BAR_HEIGHT - 2)) / STAMINA_MAX);
-    if (fillHeight > 0) {
-        int16_t fillY = STAMINA_BAR_Y + (STAMINA_BAR_HEIGHT - 1) - fillHeight;
-        renderer.fillRect(STAMINA_BAR_X + 1, fillY,
-                          STAMINA_BAR_WIDTH - 2, fillHeight, COLOR_WHITE);
-    }
-
-    // Blink entire bar when stamina is critically low
-    if (player.stamina < STAMINA_CRITICAL_THRESHOLD && (world.gameTime / 8) % 2 == 0) {
-        renderer.fillRect(STAMINA_BAR_X, STAMINA_BAR_Y,
-                          STAMINA_BAR_WIDTH, STAMINA_BAR_HEIGHT, COLOR_BLACK);
-    }
+  // Blink entire bar when stamina is critically low
+  if (player.stamina < STAMINA_CRITICAL_THRESHOLD &&
+      (world.gameTime / 8) % 2 == 0) {
+    renderer.fillRect(STAMINA_BAR_X - 1, STAMINA_BAR_Y, STAMINA_BAR_WIDTH + 2,
+                      STAMINA_BAR_HEIGHT, COLOR_BLACK);
+  }
 }
 
 // =============================================================================
@@ -724,90 +896,100 @@ void Game::renderHUD(HalRenderer& renderer) {
 // tangential drift. Each particle is a single white pixel with flicker effect.
 //
 // FOR FUTURE AGENTS / TUNING:
-//   - PARTICLE_GRAVITY_MULT controls how fast particles spiral inward (3x default)
+//   - PARTICLE_GRAVITY_MULT controls how fast particles spiral inward (3x
+//   default)
 //   - PARTICLE_ORBITAL_SPEED controls tangential rotation speed
 //   - PARTICLE_LIFETIME controls how long particles live before fading
-//   - PARTICLE_SPAWN_INTERVAL controls spawn rate (lower = more particles visible)
-//   - If particles look too sparse, reduce PARTICLE_SPAWN_INTERVAL or increase MAX_GRAVITY_PARTICLES
-//   - If CPU is tight, reduce MAX_GRAVITY_PARTICLES or increase PARTICLE_SPAWN_INTERVAL
+//   - PARTICLE_SPAWN_INTERVAL controls spawn rate (lower = more particles
+//   visible)
+//   - If particles look too sparse, reduce PARTICLE_SPAWN_INTERVAL or increase
+//   MAX_GRAVITY_PARTICLES
+//   - If CPU is tight, reduce MAX_GRAVITY_PARTICLES or increase
+//   PARTICLE_SPAWN_INTERVAL
 
 void Game::spawnParticle() {
-    for (uint8_t i = 0; i < MAX_GRAVITY_PARTICLES; i++) {
-        if (particles[i].life == 0) {
-            // Spawn at random angle on the whitehole's charge radius perimeter
-            uint8_t angle = (uint8_t)(world.nextRandom() & 255);
-            int16_t chargePixels = FP_TO_INT(world.bhCharge);
-            if (chargePixels < 20) chargePixels = 20;  // Minimum visual radius
+  for (uint8_t i = 0; i < MAX_GRAVITY_PARTICLES; i++) {
+    if (particles[i].life == 0) {
+      // Spawn at random angle on the whitehole's charge radius perimeter
+      uint8_t angle = (uint8_t)(world.nextRandom() & 255);
+      int16_t chargePixels = FP_TO_INT(world.bhCharge);
+      if (chargePixels < 20)
+        chargePixels = 20; // Minimum visual radius
 
-            // Use 16-point unit circle lookup for position on perimeter
-            uint8_t dir = (angle >> 4) & 15;  // Map 0-255 to 0-15 index
-            int16_t r = chargePixels + (int16_t)(world.randomRange(0, 10));
-            int16_t dx = (int16_t)(((int32_t)UNIT_CIRCLE_X[dir] * r) / 127);
-            int16_t dy = (int16_t)(((int32_t)UNIT_CIRCLE_Y[dir] * r) / 127);
+      // Use 16-point unit circle lookup for position on perimeter
+      uint8_t dir = (angle >> 4) & 15; // Map 0-255 to 0-15 index
+      int16_t r = chargePixels + (int16_t)(world.randomRange(0, 10));
+      int16_t dx = (int16_t)(((int32_t)UNIT_CIRCLE_X[dir] * r) / 127);
+      int16_t dy = (int16_t)(((int32_t)UNIT_CIRCLE_Y[dir] * r) / 127);
 
-            particles[i].x = world.bhX + INT_TO_FP32(dx);
-            particles[i].y = world.bhY + INT_TO_FP32(dy);
-            particles[i].life = PARTICLE_LIFETIME;
-            particles[i].angle = angle;
-            return;
-        }
+      particles[i].x = world.bhX + INT_TO_FP32(dx);
+      particles[i].y = world.bhY + INT_TO_FP32(dy);
+      particles[i].life = PARTICLE_LIFETIME;
+      particles[i].angle = angle;
+      return;
     }
+  }
 }
 
 void Game::updateParticles(fp_t dt) {
-    // Spawn new particles periodically
-    particleSpawnTimer++;
-    if (particleSpawnTimer >= PARTICLE_SPAWN_INTERVAL) {
-        particleSpawnTimer = 0;
-        spawnParticle();
+  // Spawn new particles periodically
+  particleSpawnTimer++;
+  if (particleSpawnTimer >= PARTICLE_SPAWN_INTERVAL) {
+    particleSpawnTimer = 0;
+    spawnParticle();
+  }
+
+  // Update existing particles: pull toward whitehole center + slight orbital
+  // drift
+  for (uint8_t i = 0; i < MAX_GRAVITY_PARTICLES; i++) {
+    if (particles[i].life == 0)
+      continue;
+
+    // Strong inward pull (particles spiral inward faster than entities)
+    applyBlackholeGravity(particles[i].x, particles[i].y, world.bhX, world.bhY,
+                          FP_MUL(world.bhMass, PARTICLE_GRAVITY_MULT),
+                          world.bhCharge, dt);
+
+    // Orbital tangential drift (perpendicular to radial direction)
+    fp32_t dx = particles[i].x - world.bhX;
+    fp32_t dy = particles[i].y - world.bhY;
+    // Tangent vector: (-dy, dx) normalized and scaled
+    fp32_t dist =
+        approxDistance(particles[i].x, particles[i].y, world.bhX, world.bhY);
+    if (dist > FP_ONE) {
+      fp32_t tangentX = (-dy * (fp32_t)PARTICLE_ORBITAL_SPEED) / dist;
+      fp32_t tangentY = (dx * (fp32_t)PARTICLE_ORBITAL_SPEED) / dist;
+      particles[i].x += FP32_MUL(tangentX, dt);
+      particles[i].y += FP32_MUL(tangentY, dt);
     }
 
-    // Update existing particles: pull toward whitehole center + slight orbital drift
-    for (uint8_t i = 0; i < MAX_GRAVITY_PARTICLES; i++) {
-        if (particles[i].life == 0) continue;
+    // Decrement lifetime
+    particles[i].life--;
 
-        // Strong inward pull (particles spiral inward faster than entities)
-        applyBlackholeGravity(particles[i].x, particles[i].y,
-                               world.bhX, world.bhY,
-                               FP_MUL(world.bhMass, PARTICLE_GRAVITY_MULT), world.bhCharge, dt);
-
-        // Orbital tangential drift (perpendicular to radial direction)
-        fp32_t dx = particles[i].x - world.bhX;
-        fp32_t dy = particles[i].y - world.bhY;
-        // Tangent vector: (-dy, dx) normalized and scaled
-        fp32_t dist = approxDistance(particles[i].x, particles[i].y, world.bhX, world.bhY);
-        if (dist > FP_ONE) {
-            fp32_t tangentX = (-dy * (fp32_t)PARTICLE_ORBITAL_SPEED) / dist;
-            fp32_t tangentY = (dx * (fp32_t)PARTICLE_ORBITAL_SPEED) / dist;
-            particles[i].x += FP32_MUL(tangentX, dt);
-            particles[i].y += FP32_MUL(tangentY, dt);
-        }
-
-        // Decrement lifetime
-        particles[i].life--;
-
-        // Kill if very close to center (absorbed by whitehole core)
-        if (dist < INT_TO_FP32(3)) {
-            particles[i].life = 0;
-        }
+    // Kill if very close to center (absorbed by whitehole core)
+    if (dist < INT_TO_FP32(3)) {
+      particles[i].life = 0;
     }
+  }
 }
 
-void Game::renderParticles(HalRenderer& renderer) {
-    for (uint8_t i = 0; i < MAX_GRAVITY_PARTICLES; i++) {
-        if (particles[i].life == 0) continue;
+void Game::renderParticles(HalRenderer &renderer) {
+  for (uint8_t i = 0; i < MAX_GRAVITY_PARTICLES; i++) {
+    if (particles[i].life == 0)
+      continue;
 
-        int16_t sx = world.worldToScreenX(particles[i].x, particles[i].y);
-        int16_t sy = world.worldToScreenY(particles[i].y);
+    int16_t sx = world.worldToScreenX(particles[i].x, particles[i].y);
+    int16_t sy = world.worldToScreenY(particles[i].y);
 
-        // Skip if off-screen
-        if (sx < 0 || sx >= SCREEN_W || sy < 0 || sy >= SCREEN_H) continue;
+    // Skip if off-screen
+    if (sx < 0 || sx >= SCREEN_W || sy < 0 || sy >= SCREEN_H)
+      continue;
 
-        // Flicker effect: draw every other frame for ethereal look
-        if ((particles[i].life + i) % 2 == 0) {
-            renderer.drawPixel(sx, sy, COLOR_WHITE);
-        }
+    // Flicker effect: draw every other frame for ethereal look
+    if ((particles[i].life + i) % 2 == 0) {
+      renderer.drawPixel(sx, sy, COLOR_WHITE);
     }
+  }
 }
 
 // =============================================================================
@@ -818,25 +1000,39 @@ void Game::renderParticles(HalRenderer& renderer) {
 //
 // FOR FUTURE AGENTS / TUNING:
 //   - If distortion looks too strong, increase the divisor constant (64 below)
-//   - If distortion looks too weak, decrease it or increase GRID_DISTORT_MAX_STRENGTH
+//   - If distortion looks too weak, decrease it or increase
+//   GRID_DISTORT_MAX_STRENGTH
 //   - radiusSq should be GRID_DISTORT_RADIUS^2 (precomputed by caller)
 
-int16_t Game::applyGridDistortion(int16_t px, int16_t py,
-                                   int16_t bhSX, int16_t bhSY,
-                                   int16_t strength, int16_t radiusSq) {
-    int16_t dx = px - bhSX;
-    int16_t dy = py - bhSY;
-    int32_t d2 = (int32_t)dx * dx + (int32_t)dy * dy;
+void Game::applyGridDistortion2D(int16_t px, int16_t py, int16_t bhSX,
+                                 int16_t bhSY, int16_t strength,
+                                 int16_t radiusSq, int16_t &outX,
+                                 int16_t &outY) {
+  int16_t dx = px - bhSX;
+  int16_t dy = py - bhSY;
+  int32_t d2 = (int32_t)dx * dx + (int32_t)dy * dy;
 
-    if (d2 <= 0 || d2 >= (int32_t)radiusSq) {
-        return px;  // Outside distortion radius — no effect
-    }
+  if (d2 <= 0 || d2 >= (int32_t)radiusSq) {
+    outX = px;
+    outY = py;
+    return;
+  }
 
-    // Shift X toward whitehole, proportional to (radiusSq - d2) / radiusSq
-    int32_t factor = (int32_t)radiusSq - d2;
-    int16_t shiftX = (int16_t)(((int32_t)(-dx) * strength * factor) /
-                               ((int32_t)radiusSq * 64));
-    return px + shiftX;
+  int32_t factor = (int32_t)radiusSq - d2;
+  int16_t shiftX = (int16_t)(((int32_t)(-dx) * strength * factor) /
+                             ((int32_t)radiusSq * 64));
+  int16_t shiftY = (int16_t)(((int32_t)(-dy) * strength * factor) /
+                             ((int32_t)radiusSq * 64));
+  outX = px + shiftX;
+  outY = py + shiftY;
+}
+
+int16_t Game::applyGridDistortion(int16_t px, int16_t py, int16_t bhSX,
+                                  int16_t bhSY, int16_t strength,
+                                  int16_t radiusSq) {
+  int16_t ox, oy;
+  applyGridDistortion2D(px, py, bhSX, bhSY, strength, radiusSq, ox, oy);
+  return ox;
 }
 
 // =============================================================================
@@ -844,54 +1040,60 @@ int16_t Game::applyGridDistortion(int16_t px, int16_t py,
 // =============================================================================
 
 uint8_t Game::getTitleCharWidth(char c) const {
-    if (c < TITLE_FONT_ASCII_MIN || c > TITLE_FONT_ASCII_MAX) {
-        return 4; // default space width
-    }
-    uint8_t idx = pgm_read_byte(&title_font_map[c - TITLE_FONT_ASCII_MIN]);
-    if (idx == 255) return 4;
-    const uint8_t* glyph_ptr = (const uint8_t*)&title_font_glyphs[idx];
-    return pgm_read_byte(glyph_ptr);
+  if (c < TITLE_FONT_ASCII_MIN || c > TITLE_FONT_ASCII_MAX) {
+    return 4; // default space width
+  }
+  uint8_t idx = pgm_read_byte(&title_font_map[c - TITLE_FONT_ASCII_MIN]);
+  if (idx == 255)
+    return 4;
+  const uint8_t *glyph_ptr = (const uint8_t *)&title_font_glyphs[idx];
+  return pgm_read_byte(glyph_ptr);
 }
 
-uint16_t Game::getTitleTextWidth(const char* str) const {
-    uint16_t w = 0;
-    while (*str) {
-        w += getTitleCharWidth(*str++);
-        if (*str) w += 1; // 1px spacing between chars
-    }
-    return w;
+uint16_t Game::getTitleTextWidth(const char *str) const {
+  uint16_t w = 0;
+  while (*str) {
+    w += getTitleCharWidth(*str++);
+    if (*str)
+      w += 1; // 1px spacing between chars
+  }
+  return w;
 }
 
-void Game::drawTitleChar(HalRenderer& renderer, int16_t x, int16_t y, char c) {
-    if (c < TITLE_FONT_ASCII_MIN || c > TITLE_FONT_ASCII_MAX) return;
-    uint8_t idx = pgm_read_byte(&title_font_map[c - TITLE_FONT_ASCII_MIN]);
-    if (idx == 255) return;
+void Game::drawTitleChar(HalRenderer &renderer, int16_t x, int16_t y, char c) {
+  if (c < TITLE_FONT_ASCII_MIN || c > TITLE_FONT_ASCII_MAX)
+    return;
+  uint8_t idx = pgm_read_byte(&title_font_map[c - TITLE_FONT_ASCII_MIN]);
+  if (idx == 255)
+    return;
 
-    const uint8_t* glyph_ptr = (const uint8_t*)&title_font_glyphs[idx];
-    uint8_t width = pgm_read_byte(glyph_ptr);
-    const uint8_t* cols = glyph_ptr + 1;
+  const uint8_t *glyph_ptr = (const uint8_t *)&title_font_glyphs[idx];
+  uint8_t width = pgm_read_byte(glyph_ptr);
+  const uint8_t *cols = glyph_ptr + 1;
 
-    for (uint8_t col = 0; col < width; col++) {
-        uint8_t b = pgm_read_byte(cols + col);
-        int16_t px = x + col;
-        if (px < 0 || px >= SCREEN_W) continue;
-        for (uint8_t bit = 0; bit < 8; bit++) {
-            if (b & (1 << bit)) {
-                int16_t py = y + bit;
-                if (py >= 0 && py < SCREEN_H) {
-                    renderer.drawPixel(px, py, COLOR_WHITE);
-                }
-            }
+  for (uint8_t col = 0; col < width; col++) {
+    uint8_t b = pgm_read_byte(cols + col);
+    int16_t px = x + col;
+    if (px < 0 || px >= SCREEN_W)
+      continue;
+    for (uint8_t bit = 0; bit < 8; bit++) {
+      if (b & (1 << bit)) {
+        int16_t py = y + bit;
+        if (py >= 0 && py < SCREEN_H) {
+          renderer.drawPixel(px, py, COLOR_WHITE);
         }
+      }
     }
+  }
 }
 
-void Game::drawTitleText(HalRenderer& renderer, int16_t x, int16_t y, const char* str) {
-    int16_t cur_x = x;
-    while (*str) {
-        char c = *str++;
-        uint8_t w = getTitleCharWidth(c);
-        drawTitleChar(renderer, cur_x, y, c);
-        cur_x += w + 1; // 1px spacing
-    }
+void Game::drawTitleText(HalRenderer &renderer, int16_t x, int16_t y,
+                         const char *str) {
+  int16_t cur_x = x;
+  while (*str) {
+    char c = *str++;
+    uint8_t w = getTitleCharWidth(c);
+    drawTitleChar(renderer, cur_x, y, c);
+    cur_x += w + 1; // 1px spacing
+  }
 }

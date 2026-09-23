@@ -67,14 +67,11 @@
 //   - spawnInterval decreases every SPAWN_RAMP_INTERVAL frames
 //   This ensures the game gets progressively harder with no respite.
 //
-// FOR IMPLEMENTING AGENTS:
-//   - M1: Implement camera tracking (simple: camX = player.x, camY = player.y)
-//   - M2: Implement spawning logic (spawnTimer countdown, random position/type)
-//   - M2: Implement despawning (iterate entities, check distance from camera)
-//   - M3: Implement blackhole movement (moveToward from physics.h)
-//   - M3: Implement difficulty ramping (increment bhSpeed, bhCharge, decrement spawnInterval)
-//   - M4: Implement background grid rendering in Game::renderBackground()
-//
+// IMPLEMENTATION STATUS:
+//   - M1: Camera tracking (implemented)
+//   - M2: Spawning and despawning logic (implemented)
+//   - M3: Blackhole movement and difficulty ramping (implemented)
+//   - M4: Background grid rendering in Game::renderBackground() (implemented)
 // =============================================================================
 
 #ifndef WORLD_H

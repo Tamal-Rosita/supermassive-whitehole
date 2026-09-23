@@ -393,6 +393,10 @@ static const int16_t BH_START_DISTANCE = 80;
 // core are consumed/despawned. Creates a visual "absorption" effect.
 static const uint8_t BH_ABSORB_RADIUS = 4;
 
+// Absorption growth (M3): food increases whitehole mass; money increases charge/radius
+static const fp_t BH_FOOD_ABSORB_MASS_INC = FLOAT_TO_FP(0.02);
+static const fp_t BH_MONEY_ABSORB_CHARGE_INC = INT_TO_FP(1);
+
 // BH_PLAYER_GRAVITY_SCALE: Fraction of gravity force applied to the player
 // compared to entities. 0.25 = player feels 25% of the pull. Low enough to
 // be escapable with A + direction, high enough to create tension.
@@ -431,6 +435,7 @@ static const uint8_t GRID_DISTORT_MAX_STRENGTH =
 static const uint8_t GRID_DISTORT_RADIUS =
     80; // Screen-space radius of distortion effect (px)
 static const uint8_t GRID_HSEG_COUNT = 8; // Segments per horizontal depth line
+static const uint8_t GRID_VSEG_COUNT = 4; // Segments per vertical perspective ray
 
 // =============================================================================
 // SPAWNING CONSTANTS

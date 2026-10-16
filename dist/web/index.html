@@ -27,6 +27,31 @@
             window.addEventListener("blur", function() {
                 document.body.classList.remove("game-focused");
             });
+
+            // WebAudio autoplay policy unlock: track created contexts and auto-resume on first interaction
+            var origAudioContext = window.AudioContext || window.webkitAudioContext;
+            var audioCtxList = [];
+            if (origAudioContext) {
+                var PatchedAudioContext = function() {
+                    var ctx = new origAudioContext();
+                    audioCtxList.push(ctx);
+                    return ctx;
+                };
+                PatchedAudioContext.prototype = origAudioContext.prototype;
+                window.AudioContext = PatchedAudioContext;
+                window.webkitAudioContext = PatchedAudioContext;
+            }
+            function unlockAudio() {
+                audioCtxList.forEach(function(ctx) {
+                    if (ctx && ctx.state === "suspended") {
+                        ctx.resume();
+                    }
+                });
+            }
+            window.addEventListener("pointerdown", unlockAudio, { passive: true });
+            window.addEventListener("click", unlockAudio, { passive: true });
+            window.addEventListener("keydown", unlockAudio, { passive: true });
+            window.addEventListener("touchstart", unlockAudio, { passive: true });
         })();
     </script>
     <link rel="stylesheet" href="style.css?v=0.3.4">

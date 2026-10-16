@@ -272,12 +272,11 @@ private:
     // Iterate entityManager.entities[]. For each active entity:
     //   1. Convert world position to screen: sx, sy = worldToScreen()
     //   2. Skip if off-screen (optional optimization)
-    //   3. Draw based on entity type:
-    //      - FOOD_PIZZA:  fillTriangle (equilateral, centered on sx,sy)
-    //      - FOOD_BURGER: fillRect (centered on sx,sy, FOOD_BURGER_SIZE square)
-    //      - FOOD_DONUT:  fillCircle (sx, sy, DONUT_SPRITE_RADIUS)
-    //      - COLLECTIBLE: draw diamond shape (4 lines or 2 fillTriangles)
-    //   All drawn in COLOR_WHITE.
+    //   3. Draw based on entity type using items_sprites PROGMEM sheet:
+    //      - FOOD (15 hazards ordered by calories): Strawberry, Carrot, Candy, Cherries,
+    //        Watermelon, Corn, Sushi, Beer, Donut, Ice Cream, Drumstick, Pizza, Hotdog, Pretzel, Burger
+    //      - COLLECTIBLES: Diamond, Dollar Bills
+    //      - POWER-UP: Coffee Mug
     void renderEntities(HalRenderer& renderer);
 
     // =========================================================================

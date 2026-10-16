@@ -24,7 +24,8 @@ struct ArduboyAudio {
         : sound(audio.enabled), audioRef(audio) {}
 
     void init() {
-        // Arduboy audio system is initialized by arduboy.begin()
+        audioRef.on();
+        sound.volumeMode(VOLUME_ALWAYS_NORMAL);
     }
 
     void tone(uint16_t freq, uint16_t duration) {

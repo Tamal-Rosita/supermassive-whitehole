@@ -22,6 +22,9 @@
 void Game::init(HalStorage &storage, HalAudio &audio) {
   storageRef = &storage;
   audioRef = &audio;
+  if (audioRef) {
+    audioRef->init();
+  }
   highScore = storage.loadHighScore();
   state = STATE_TITLE;
   score = 0;
@@ -37,6 +40,9 @@ void Game::playSound(SoundId sound) {
   if (!audioRef || !audioRef->isAudioEnabled())
     return;
   switch (sound) {
+  case SOUND_ID_THEME:
+    audioRef->tones(sound_smwh_theme);
+    break;
   case SOUND_ID_DIAMOND:
     audioRef->tones(sound_diamond);
     break;
@@ -135,6 +141,9 @@ void Game::reset() {
 // =============================================================================
 
 void Game::updateTitle(HalInput &input, fp_t dt) {
+  if (audioRef && audioRef->isAudioEnabled() && !audioRef->isPlaying()) {
+    playSound(SOUND_ID_THEME);
+  }
   world.timeAccum += dt;
   while (world.timeAccum >= FP_DT_ONE) {
     world.timeAccum -= FP_DT_ONE;
@@ -209,7 +218,7 @@ void Game::updatePlaying(HalInput &input, fp_t dt) {
     //   30% Diamond (+10 pts)
     //   10% Dollar Bills (+25 pts)
     //   15% Coffee powerup (speed boost + cleanse)
-    //   45% Food hazards (split evenly across 8 food hazards)
+    //   45% Food hazards (split across 15 food hazards weighted by appearance frequency)
     uint16_t roll = world.randomRange(0, 99);
     EntityType spawnType;
     if (roll < 30) {
@@ -219,9 +228,15 @@ void Game::updatePlaying(HalInput &input, fp_t dt) {
     } else if (roll < 55) {
       spawnType = ENTITY_POWERUP_COFFEE;
     } else {
-      // Food hazards (8 distinct types: APPLE through ICECREAM)
-      uint8_t foodRoll = world.randomRange(0, 7);
-      spawnType = (EntityType)(ENTITY_FOOD_APPLE + foodRoll);
+      // Food hazards (15 distinct types ordered by calories, weighted by appearance frequency)
+      uint8_t foodRoll = world.randomRange(0, 99);
+      spawnType = (EntityType)ENTITY_FOOD_LAST;
+      for (uint8_t f = 0; f < ENTITY_FOOD_COUNT; f++) {
+        if (foodRoll < FOOD_SPAWN_CUMULATIVE_THRESHOLDS[f]) {
+          spawnType = (EntityType)(ENTITY_FOOD_FIRST + f);
+          break;
+        }
+      }
     }
 
     bool isMoney = (spawnType == ENTITY_COLLECTIBLE_DIAMOND ||
@@ -374,11 +389,9 @@ void Game::updatePlaying(HalInput &input, fp_t dt) {
   // 5c. Update accretion particles (M3)
   updateParticles(dt);
 
-  // 5d. Ambient cosmic pulse (M5)
-  ambientBeatTimer++;
-  if (ambientBeatTimer >= 120) {
-    ambientBeatTimer = 0;
-    playSound(SOUND_ID_AMBIENT_BEAT);
+  // 5d. Gameplay soundtrack loop from smwh_score.mid
+  if (audioRef && audioRef->isAudioEnabled() && !audioRef->isPlaying()) {
+    playSound(SOUND_ID_THEME);
   }
 
   // 6. Check player-entity collisions
@@ -693,37 +706,58 @@ void Game::renderEntities(HalRenderer &renderer) {
 
     uint8_t frame = 0;
     switch (e.type) {
-    case ENTITY_FOOD_APPLE:
-      frame = SPRITE_ITEM_APPLE;
+    case ENTITY_FOOD_STRAWBERRY: // 1: Frame 4: Strawberry
+      frame = SPRITE_ITEM_STRAWBERRY;
       break;
-    case ENTITY_FOOD_PIZZA:
-      frame = SPRITE_ITEM_PIZZA;
+    case ENTITY_FOOD_CARROT: // 2: Frame 15: Carrot
+      frame = SPRITE_ITEM_CARROT;
       break;
-    case ENTITY_FOOD_TACO:
-      frame = SPRITE_ITEM_TACO;
+    case ENTITY_FOOD_CANDY: // 3: Frame 10: Candy
+      frame = SPRITE_ITEM_CANDY;
       break;
-    case ENTITY_FOOD_BURGER:
-      frame = SPRITE_ITEM_BURGER;
+    case ENTITY_FOOD_CHERRIES: // 4: Frame 5: Cherries
+      frame = SPRITE_ITEM_CHERRIES;
       break;
-    case ENTITY_FOOD_FRIES:
-      frame = SPRITE_ITEM_FRIES;
+    case ENTITY_FOOD_WATERMELON: // 5: Frame 7: Watermelon
+      frame = SPRITE_ITEM_WATERMELON;
       break;
-    case ENTITY_FOOD_CAKE:
-      frame = SPRITE_ITEM_CAKE;
+    case ENTITY_FOOD_CORN: // 6: Frame 8: Corn
+      frame = SPRITE_ITEM_CORN;
       break;
-    case ENTITY_FOOD_DONUT:
+    case ENTITY_FOOD_SUSHI: // 7: Frame 16: Sushi
+      frame = SPRITE_ITEM_SUSHI;
+      break;
+    case ENTITY_FOOD_BEER: // 8: Frame 13: Beer (formerly Cake)
+      frame = SPRITE_ITEM_BEER;
+      break;
+    case ENTITY_FOOD_DONUT: // 9: Frame 14: Donut
       frame = SPRITE_ITEM_DONUT;
       break;
-    case ENTITY_FOOD_ICECREAM:
+    case ENTITY_FOOD_ICECREAM: // 10: Frame 6: Ice Cream
       frame = SPRITE_ITEM_ICECREAM;
       break;
-    case ENTITY_COLLECTIBLE_DIAMOND:
+    case ENTITY_FOOD_DRUMSTICK: // 11: Frame 0: Drumstick
+      frame = SPRITE_ITEM_DRUMSTICK;
+      break;
+    case ENTITY_FOOD_PIZZA: // 12: Frame 1: Pizza
+      frame = SPRITE_ITEM_PIZZA;
+      break;
+    case ENTITY_FOOD_HOTDOG: // 13: Frame 3: Hotdog
+      frame = SPRITE_ITEM_HOTDOG;
+      break;
+    case ENTITY_FOOD_PRETZEL: // 14: Frame 17: Pretzel
+      frame = SPRITE_ITEM_PRETZEL;
+      break;
+    case ENTITY_FOOD_BURGER: // 15: Frame 2: Burger
+      frame = SPRITE_ITEM_BURGER;
+      break;
+    case ENTITY_COLLECTIBLE_DIAMOND: // Frame 12: Diamond
       frame = SPRITE_ITEM_DIAMOND;
       break;
-    case ENTITY_COLLECTIBLE_BILLS:
+    case ENTITY_COLLECTIBLE_BILLS: // Frame 11: Dollar Bills
       frame = SPRITE_ITEM_BILLS;
       break;
-    case ENTITY_POWERUP_COFFEE:
+    case ENTITY_POWERUP_COFFEE: // Frame 9: Coffee Mug
       frame = SPRITE_ITEM_COFFEE;
       break;
     default:

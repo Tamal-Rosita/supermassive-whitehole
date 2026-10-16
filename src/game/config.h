@@ -240,14 +240,27 @@ static const uint8_t STAMINA_MIN_TO_SPRINT   = 25;
 static const uint8_t STAMINA_COFFEE_RECOVERY = 80;
 
 // Food hazard stamina drain (added on top of existing speed slow debuff)
-static const uint8_t STAMINA_FOOD_APPLE_DRAIN    = 5;
-static const uint8_t STAMINA_FOOD_PIZZA_DRAIN    = 15;
-static const uint8_t STAMINA_FOOD_TACO_DRAIN     = 20;
-static const uint8_t STAMINA_FOOD_BURGER_DRAIN   = 30;
-static const uint8_t STAMINA_FOOD_FRIES_DRAIN    = 25;
-static const uint8_t STAMINA_FOOD_CAKE_DRAIN     = 40;
-static const uint8_t STAMINA_FOOD_DONUT_DRAIN    = 35;
-static const uint8_t STAMINA_FOOD_ICECREAM_DRAIN = 50;
+// Scaled proportionally to real-life calorie content (USDA standard portions):
+static const uint8_t STAMINA_FOOD_STRAWBERRY_DRAIN = 4;  //  ~6 kcal  (Frame 4)
+static const uint8_t STAMINA_FOOD_APPLE_DRAIN      = 4;  // alias
+static const uint8_t STAMINA_FOOD_CARROT_DRAIN     = 6;  // ~25 kcal  (Frame 15)
+static const uint8_t STAMINA_FOOD_CANDY_DRAIN      = 8;  // ~40 kcal  (Frame 10)
+static const uint8_t STAMINA_FOOD_CHERRIES_DRAIN   = 10; // ~50 kcal  (Frame 5)
+static const uint8_t STAMINA_FOOD_WATERMELON_DRAIN = 12; // ~86 kcal  (Frame 7)
+static const uint8_t STAMINA_FOOD_CORN_DRAIN       = 15; // ~90 kcal  (Frame 8)
+static const uint8_t STAMINA_FOOD_SUSHI_DRAIN      = 18; // ~120 kcal (Frame 16)
+static const uint8_t STAMINA_FOOD_BEER_DRAIN       = 25; // ~150 kcal (Frame 13)
+static const uint8_t STAMINA_FOOD_CAKE_DRAIN       = 25; // alias
+static const uint8_t STAMINA_FOOD_DONUT_DRAIN      = 30; // ~220 kcal (Frame 14)
+static const uint8_t STAMINA_FOOD_ICECREAM_DRAIN   = 42; // ~250 kcal (Frame 6, Brain freeze)
+static const uint8_t STAMINA_FOOD_DRUMSTICK_DRAIN  = 28; // ~270 kcal (Frame 0)
+static const uint8_t STAMINA_FOOD_CHICKEN_DRAIN    = 28; // alias
+static const uint8_t STAMINA_FOOD_FRIES_DRAIN      = 28; // alias
+static const uint8_t STAMINA_FOOD_PIZZA_DRAIN      = 26; // ~290 kcal (Frame 1)
+static const uint8_t STAMINA_FOOD_HOTDOG_DRAIN     = 32; // ~320 kcal (Frame 3)
+static const uint8_t STAMINA_FOOD_TACO_DRAIN       = 32; // alias
+static const uint8_t STAMINA_FOOD_PRETZEL_DRAIN    = 35; // ~390 kcal (Frame 17)
+static const uint8_t STAMINA_FOOD_BURGER_DRAIN     = 48; // ~540 kcal (Frame 2, Calorie bomb)
 
 // =============================================================================
 // STAMINA BAR HUD CONSTANTS
@@ -290,16 +303,29 @@ static const uint8_t MAX_ENTITIES = 12;
 // sprites) Food hazards have slightly forgiving hitboxes (8px) for near-miss
 // excitement. Collectibles & power-ups have generous hitboxes (10px) for
 // satisfying pickups.
-static const uint8_t FOOD_APPLE_SIZE = 8;
-static const uint8_t FOOD_PIZZA_SIZE = 8;
-static const uint8_t FOOD_TACO_SIZE = 8;
-static const uint8_t FOOD_BURGER_SIZE = 8;
-static const uint8_t FOOD_FRIES_SIZE = 8;
-static const uint8_t FOOD_CAKE_SIZE = 8;
-static const uint8_t FOOD_DONUT_SIZE = 8;
-static const uint8_t FOOD_ICECREAM_SIZE = 8;
-static const uint8_t COLLECTIBLE_SIZE = 10;
-static const uint8_t POWERUP_COFFEE_SIZE = 10;
+// Food sizes (pixels) — 8px hitboxes centered within 16x16 sprites
+static const uint8_t FOOD_STRAWBERRY_SIZE = 8;
+static const uint8_t FOOD_APPLE_SIZE      = 8; // alias
+static const uint8_t FOOD_CARROT_SIZE     = 8;
+static const uint8_t FOOD_CANDY_SIZE      = 8;
+static const uint8_t FOOD_CHERRIES_SIZE   = 8;
+static const uint8_t FOOD_WATERMELON_SIZE = 8;
+static const uint8_t FOOD_CORN_SIZE       = 8;
+static const uint8_t FOOD_SUSHI_SIZE      = 8;
+static const uint8_t FOOD_BEER_SIZE       = 8;
+static const uint8_t FOOD_CAKE_SIZE       = 8; // alias
+static const uint8_t FOOD_DONUT_SIZE      = 8;
+static const uint8_t FOOD_ICECREAM_SIZE   = 8;
+static const uint8_t FOOD_DRUMSTICK_SIZE  = 8;
+static const uint8_t FOOD_CHICKEN_SIZE    = 8; // alias
+static const uint8_t FOOD_FRIES_SIZE      = 8; // alias
+static const uint8_t FOOD_PIZZA_SIZE      = 8;
+static const uint8_t FOOD_HOTDOG_SIZE     = 8;
+static const uint8_t FOOD_TACO_SIZE       = 8; // alias
+static const uint8_t FOOD_PRETZEL_SIZE    = 8;
+static const uint8_t FOOD_BURGER_SIZE     = 8;
+static const uint8_t COLLECTIBLE_SIZE     = 10;
+static const uint8_t POWERUP_COFFEE_SIZE  = 10;
 
 // =============================================================================
 // POWER-UP CONSTANTS
@@ -313,37 +339,106 @@ static const fp_t POWERUP_COFFEE_ACCEL_BOOST =
     FLOAT_TO_FP(1.50); // +50% acceleration
 
 // =============================================================================
-// FOOD SLOWDOWN CONSTANTS (8 DISTINCT HAZARDS)
+// FOOD SLOWDOWN CONSTANTS (15 HAZARDS STRICTLY ORDERED BY REAL-LIFE CALORIES)
 // =============================================================================
 // When the fat man touches food, he's temporarily slowed.
-// Duration is in frames (at 60 FPS): 30 frames = 0.5 seconds.
+// Duration is in frames (at 60 FPS): 60 frames = 1.0 seconds.
 // Intensity is a percentage of speed REDUCTION (0-100).
 //
-// Diverse hazards ranging from quick snacks to heavy feasts:
-static const uint8_t FOOD_APPLE_SLOW_DURATION = 24;  // ~0.4 sec
-static const uint8_t FOOD_APPLE_SLOW_INTENSITY = 10; // -10% speed
+// Effects scale with real-life caloric impact (USDA standard portions):
+// 1: Strawberry (~6 kcal, Frame 4) — light snack nibble
+static const uint8_t FOOD_STRAWBERRY_SLOW_DURATION  = 20;  // ~0.33 sec
+static const uint8_t FOOD_STRAWBERRY_SLOW_INTENSITY = 10;  // -10% speed
+static const uint8_t FOOD_APPLE_SLOW_DURATION       = 20;  // alias
+static const uint8_t FOOD_APPLE_SLOW_INTENSITY      = 10;  // alias
 
-static const uint8_t FOOD_PIZZA_SLOW_DURATION = 30;  // ~0.5 sec
-static const uint8_t FOOD_PIZZA_SLOW_INTENSITY = 15; // -15% speed
+// 2: Carrot (~25 kcal, Frame 15) — crunchy root veggie
+static const uint8_t FOOD_CARROT_SLOW_DURATION      = 24;  // ~0.40 sec
+static const uint8_t FOOD_CARROT_SLOW_INTENSITY     = 12;  // -12% speed
 
-static const uint8_t FOOD_TACO_SLOW_DURATION = 45;  // ~0.75 sec
-static const uint8_t FOOD_TACO_SLOW_INTENSITY = 25; // -25% speed
+// 3: Candy (~40 kcal, Frame 10) — quick sugar spike & jaw stick
+static const uint8_t FOOD_CANDY_SLOW_DURATION       = 28;  // ~0.47 sec
+static const uint8_t FOOD_CANDY_SLOW_INTENSITY      = 14;  // -14% speed
 
-static const uint8_t FOOD_BURGER_SLOW_DURATION = 60;  // ~1.0 sec
-static const uint8_t FOOD_BURGER_SLOW_INTENSITY = 30; // -30% speed
+// 4: Cherries (~50 kcal, Frame 5) — tart stone fruit, pit spit pause
+static const uint8_t FOOD_CHERRIES_SLOW_DURATION    = 32;  // ~0.53 sec
+static const uint8_t FOOD_CHERRIES_SLOW_INTENSITY   = 16;  // -16% speed
 
-static const uint8_t FOOD_FRIES_SLOW_DURATION = 75;  // ~1.25 sec
-static const uint8_t FOOD_FRIES_SLOW_INTENSITY = 35; // -35% speed
+// 5: Watermelon (~86 kcal, Frame 7) — juicy wedge, heavy water belly
+static const uint8_t FOOD_WATERMELON_SLOW_DURATION  = 36;  // ~0.60 sec
+static const uint8_t FOOD_WATERMELON_SLOW_INTENSITY = 18;  // -18% speed
 
-static const uint8_t FOOD_CAKE_SLOW_DURATION = 105; // ~1.75 sec
-static const uint8_t FOOD_CAKE_SLOW_INTENSITY = 45; // -45% speed
+// 6: Corn (~90 kcal, Frame 8) — buttered chewy cob
+static const uint8_t FOOD_CORN_SLOW_DURATION        = 44;  // ~0.73 sec
+static const uint8_t FOOD_CORN_SLOW_INTENSITY       = 22;  // -22% speed
 
-static const uint8_t FOOD_DONUT_SLOW_DURATION = 90;  // ~1.5 sec
-static const uint8_t FOOD_DONUT_SLOW_INTENSITY = 50; // -50% speed
+// 7: Sushi (~120 kcal, Frame 16) — wasabi kick & rice heaviness
+static const uint8_t FOOD_SUSHI_SLOW_DURATION       = 50;  // ~0.83 sec
+static const uint8_t FOOD_SUSHI_SLOW_INTENSITY      = 25;  // -25% speed
 
-static const uint8_t FOOD_ICECREAM_SLOW_DURATION =
-    120; // ~2.0 sec (Brain freeze!)
-static const uint8_t FOOD_ICECREAM_SLOW_INTENSITY = 60; // -60% speed
+// 8: Beer (~150 kcal, Frame 13) — alcohol buzz: longest lasting disorientation
+static const uint8_t FOOD_BEER_SLOW_DURATION        = 120; // ~2.00 sec (Drunken buzz!)
+static const uint8_t FOOD_BEER_SLOW_INTENSITY       = 35;  // -35% speed
+static const uint8_t FOOD_CAKE_SLOW_DURATION        = 120; // alias
+static const uint8_t FOOD_CAKE_SLOW_INTENSITY       = 35;  // alias
+
+// 9: Donut (~220 kcal, Frame 14) — glazed sugar rush & heavy crash
+static const uint8_t FOOD_DONUT_SLOW_DURATION       = 65;  // ~1.08 sec
+static const uint8_t FOOD_DONUT_SLOW_INTENSITY      = 38;  // -38% speed
+
+// 10: Ice Cream (~250 kcal, Frame 6) — sudden paralyzing brain freeze
+static const uint8_t FOOD_ICECREAM_SLOW_DURATION    = 100; // ~1.67 sec (Brain freeze!)
+static const uint8_t FOOD_ICECREAM_SLOW_INTENSITY   = 55;  // -55% speed
+
+// 11: Drumstick (~270 kcal, Frame 0) — fried chicken grease slump
+static const uint8_t FOOD_DRUMSTICK_SLOW_DURATION   = 75;  // ~1.25 sec
+static const uint8_t FOOD_DRUMSTICK_SLOW_INTENSITY  = 32;  // -32% speed
+static const uint8_t FOOD_CHICKEN_SLOW_DURATION     = 75;  // alias
+static const uint8_t FOOD_CHICKEN_SLOW_INTENSITY    = 32;  // alias
+static const uint8_t FOOD_FRIES_SLOW_DURATION       = 75;  // alias
+static const uint8_t FOOD_FRIES_SLOW_INTENSITY      = 32;  // alias
+
+// 12: Pizza (~290 kcal, Frame 1) — molten cheese greasy carb slice
+static const uint8_t FOOD_PIZZA_SLOW_DURATION       = 70;  // ~1.17 sec
+static const uint8_t FOOD_PIZZA_SLOW_INTENSITY      = 30;  // -30% speed
+
+// 13: Hotdog (~320 kcal, Frame 3) — stadium dog with processed meat & bun
+static const uint8_t FOOD_HOTDOG_SLOW_DURATION      = 80;  // ~1.33 sec
+static const uint8_t FOOD_HOTDOG_SLOW_INTENSITY     = 34;  // -34% speed
+static const uint8_t FOOD_TACO_SLOW_DURATION        = 80;  // alias
+static const uint8_t FOOD_TACO_SLOW_INTENSITY       = 34;  // alias
+
+// 14: Pretzel (~390 kcal, Frame 17) — salty giant knot, dry throat drag
+static const uint8_t FOOD_PRETZEL_SLOW_DURATION     = 85;  // ~1.42 sec
+static const uint8_t FOOD_PRETZEL_SLOW_INTENSITY    = 36;  // -36% speed
+
+// 15: Burger (~540 kcal, Frame 2) — ultimate double-patty calorie bomb coma
+static const uint8_t FOOD_BURGER_SLOW_DURATION      = 110; // ~1.83 sec
+static const uint8_t FOOD_BURGER_SLOW_INTENSITY     = 50;  // -50% speed
+
+// =============================================================================
+// FOOD SPAWN FREQUENCY (APPEARANCE WEIGHT METRICS)
+// =============================================================================
+// Appearance frequency weights summing to 100%.
+// Common snacks (8-10%) spawn frequently; rare calorie bombs (4%) appear sparingly.
+// Thresholds map to ENTITY_FOOD_FIRST (Strawberry) through ENTITY_FOOD_LAST (Burger).
+static const uint8_t FOOD_SPAWN_CUMULATIVE_THRESHOLDS[15] = {
+    10, //  0: Strawberry  10% (roll < 10)  Common
+    19, //  1: Carrot        9% (roll < 19)  Common
+    27, //  2: Candy         8% (roll < 27)  Common
+    36, //  3: Cherries      9% (roll < 36)  Common
+    44, //  4: Watermelon    8% (roll < 44)  Common
+    51, //  5: Corn          7% (roll < 51)  Uncommon
+    58, //  6: Sushi         7% (roll < 58)  Uncommon
+    62, //  7: Beer          4% (roll < 62)  Rare (Buzz)
+    68, //  8: Donut         6% (roll < 68)  Uncommon
+    72, //  9: Ice Cream     4% (roll < 72)  Rare (Freeze)
+    78, // 10: Drumstick     6% (roll < 78)  Uncommon
+    84, // 11: Pizza         6% (roll < 84)  Uncommon
+    90, // 12: Hotdog        6% (roll < 90)  Uncommon
+    96, // 13: Pretzel       6% (roll < 96)  Uncommon
+    100 // 14: Burger        4% (roll < 100) Rare (Coma)
+};
 
 // =============================================================================
 // BLACKHOLE CONSTANTS

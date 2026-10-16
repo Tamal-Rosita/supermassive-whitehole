@@ -103,16 +103,23 @@ TITLE → (Press A) → PLAYING → (Blackhole catches player) → GAME OVER
 - **Collectibles (Money)** (`items_16.png`):
   - **Diamond**: 16x16 faceted gem (Frame 12, +10 pts)
   - **Dollar Bills**: 16x16 bill stack with `$` (Frame 11, +25 pts)
-- **Power-Up**: 16x16 Coffee Mug (`items_16.png`, Frame 0, +speed & cleanse)
-- **Food Hazards (8 Distinct Types)** (`items_16.png`):
-  - **Apple**: Snack (Frame 6, -10% speed for 0.4s)
-  - **Pizza**: Light (Frame 3, -15% speed for 0.5s)
-  - **Taco**: Spicy (Frame 10, -25% speed for 0.75s)
-  - **Burger**: Medium (Frame 2, -30% speed for 1.0s)
-  - **French Fries**: Salty (Frame 9, -35% speed for 1.25s)
-  - **Cake**: Sugar crash (Frame 13, -45% speed for 1.75s)
-  - **Donut**: Heavy (Frame 4, -50% speed for 1.5s)
-  - **Ice Cream**: Brain freeze (Frame 8, -60% speed for 2.0s)
+- **Power-Up**: 16x16 Coffee Mug (`items_16.png`, Frame 9, +speed & cleanse)
+- **Food Hazards (15 Types Strictly Ordered by Real-Life Calories)** (`items_16.png`):
+  1. **Strawberry**: ~6 kcal (Frame 4, Common 10%, -10% speed for 0.33s, 4 stamina drain)
+  2. **Carrot**: ~25 kcal (Frame 15, Common 9%, -12% speed for 0.40s, 6 stamina drain)
+  3. **Candy**: ~40 kcal (Frame 10, Common 8%, -14% speed for 0.47s, 8 stamina drain)
+  4. **Cherries**: ~50 kcal (Frame 5, Common 9%, -16% speed for 0.53s, 10 stamina drain)
+  5. **Watermelon**: ~86 kcal (Frame 7, Common 8%, -18% speed for 0.60s, 12 stamina drain)
+  6. **Corn**: ~90 kcal (Frame 8, Uncommon 7%, -22% speed for 0.73s, 15 stamina drain)
+  7. **Sushi**: ~120 kcal (Frame 16, Uncommon 7%, -25% speed for 0.83s, 18 stamina drain)
+  8. **Beer**: ~150 kcal (Frame 13, Rare 4%, -35% speed for 2.00s, 25 stamina drain — drunken buzz)
+  9. **Donut**: ~220 kcal (Frame 14, Uncommon 6%, -38% speed for 1.08s, 30 stamina drain)
+  10. **Ice Cream**: ~250 kcal (Frame 6, Rare 4%, -55% speed for 1.67s, 42 stamina drain — brain freeze)
+  11. **Drumstick**: ~270 kcal (Frame 0, Uncommon 6%, -32% speed for 1.25s, 28 stamina drain)
+  12. **Pizza**: ~290 kcal (Frame 1, Uncommon 6%, -30% speed for 1.17s, 26 stamina drain)
+  13. **Hotdog**: ~320 kcal (Frame 3, Uncommon 6%, -34% speed for 1.33s, 32 stamina drain)
+  14. **Pretzel**: ~390 kcal (Frame 17, Uncommon 6%, -36% speed for 1.42s, 35 stamina drain)
+  15. **Burger**: ~540 kcal (Frame 2, Rare 4%, -50% speed for 1.83s, 48 stamina drain — food coma)
 
 ---
 

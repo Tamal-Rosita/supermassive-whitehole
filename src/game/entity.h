@@ -25,11 +25,16 @@
 //      - COLLECTIBLE: add score, then despawn
 //
 // ENTITY TYPES:
-//   ENTITY_NONE       — Inactive slot (available for spawning)
-//   ENTITY_FOOD_PIZZA — Triangle placeholder. Light slow on contact.
-//   ENTITY_FOOD_BURGER— Square placeholder. Medium slow on contact.
-//   ENTITY_FOOD_DONUT — Circle placeholder. Heavy slow on contact.
-//   ENTITY_COLLECTIBLE— Diamond placeholder. Adds score on contact.
+//   ENTITY_NONE               — Inactive slot (available for spawning)
+//   ENTITY_COLLECTIBLE_DIAMOND— Faceted Diamond (+10 pts * combo)
+//   ENTITY_COLLECTIBLE_BILLS  — Dollar Bills stack (+25 pts * combo)
+//   ENTITY_POWERUP_COFFEE     — Coffee mug (Turbo speed + cleanse for 3s)
+//   ENTITY_FOOD_*             — 15 food hazards ordered by real-life calorie content:
+//                               Strawberry (~6 kcal), Carrot (~25 kcal), Candy (~40 kcal),
+//                               Cherries (~50 kcal), Watermelon (~86 kcal), Corn (~90 kcal),
+//                               Sushi (~120 kcal), Beer (~150 kcal), Donut (~220 kcal),
+//                               Ice Cream (~250 kcal), Drumstick (~270 kcal), Pizza (~290 kcal),
+//                               Hotdog (~320 kcal), Pretzel (~390 kcal), Burger (~540 kcal).
 //
 // FOR IMPLEMENTING AGENTS:
 //   - M2: Implement EntityManager::spawn() — find first ENTITY_NONE slot,
@@ -56,22 +61,39 @@
 enum EntityType : uint8_t {
     ENTITY_NONE                 = 0,  // Inactive / empty slot — available for reuse
     // Money / Collectibles (Diamond + Bills)
-    ENTITY_COLLECTIBLE_DIAMOND  = 1,  // Faceted Diamond (+10 pts * combo)
-    ENTITY_COLLECTIBLE_BILLS    = 2,  // Dollar Bills stack (+25 pts * combo)
+    ENTITY_COLLECTIBLE_DIAMOND  = 1,  // Faceted Diamond (+10 pts * combo, Frame 12)
+    ENTITY_COLLECTIBLE_BILLS    = 2,  // Dollar Bills stack (+25 pts * combo, Frame 11)
     // Power-ups
-    ENTITY_POWERUP_COFFEE       = 3,  // Coffee mug (Turbo speed + cleanse for 3s)
-    // 8 Distinct Food Hazards (from items_16.png)
-    ENTITY_FOOD_APPLE           = 4,  // Apple (Snack: 24 frames, -10% speed)
-    ENTITY_FOOD_PIZZA           = 5,  // Pizza slice (Light: 30 frames, -15% speed)
-    ENTITY_FOOD_TACO            = 6,  // Taco (Spicy: 45 frames, -25% speed)
-    ENTITY_FOOD_BURGER          = 7,  // Burger (Medium: 60 frames, -30% speed)
-    ENTITY_FOOD_FRIES           = 8,  // French fries (Salty: 75 frames, -35% speed)
-    ENTITY_FOOD_CAKE            = 9,  // Cake (Sugar crash: 105 frames, -45% speed)
-    ENTITY_FOOD_DONUT           = 10, // Donut (Heavy: 90 frames, -50% speed)
-    ENTITY_FOOD_ICECREAM        = 11, // Ice Cream (Brain freeze: 120 frames, -60% speed)
-    // Alias for backwards compatibility
+    ENTITY_POWERUP_COFFEE       = 3,  // Coffee mug (Turbo speed + cleanse for 3s, Frame 9)
+    // 15 Food Hazards — Strictly Ordered by Real-Life Calorie Content (Lowest to Highest)
+    ENTITY_FOOD_STRAWBERRY      = 4,  // 1: Strawberry  (~6 kcal, Frame 4, Common 10%)
+    ENTITY_FOOD_CARROT          = 5,  // 2: Carrot      (~25 kcal, Frame 15, Common 9%)
+    ENTITY_FOOD_CANDY           = 6,  // 3: Candy       (~40 kcal, Frame 10, Common 8%)
+    ENTITY_FOOD_CHERRIES        = 7,  // 4: Cherries    (~50 kcal, Frame 5, Common 9%)
+    ENTITY_FOOD_WATERMELON      = 8,  // 5: Watermelon  (~86 kcal, Frame 7, Common 8%)
+    ENTITY_FOOD_CORN            = 9,  // 6: Corn        (~90 kcal, Frame 8, Uncommon 7%)
+    ENTITY_FOOD_SUSHI           = 10, // 7: Sushi       (~120 kcal, Frame 16, Uncommon 7%)
+    ENTITY_FOOD_BEER            = 11, // 8: Beer        (~150 kcal, Frame 13, Rare 4% — buzz)
+    ENTITY_FOOD_DONUT           = 12, // 9: Donut       (~220 kcal, Frame 14, Uncommon 6%)
+    ENTITY_FOOD_ICECREAM        = 13, // 10: Ice Cream  (~250 kcal, Frame 6, Rare 4% — freeze)
+    ENTITY_FOOD_DRUMSTICK       = 14, // 11: Drumstick  (~270 kcal, Frame 0, Uncommon 6%)
+    ENTITY_FOOD_PIZZA           = 15, // 12: Pizza      (~290 kcal, Frame 1, Uncommon 6%)
+    ENTITY_FOOD_HOTDOG          = 16, // 13: Hotdog     (~320 kcal, Frame 3, Uncommon 6%)
+    ENTITY_FOOD_PRETZEL         = 17, // 14: Pretzel    (~390 kcal, Frame 17, Uncommon 6%)
+    ENTITY_FOOD_BURGER          = 18, // 15: Burger     (~540 kcal, Frame 2, Rare 4% — coma)
+
+    // Aliases for backwards compatibility
+    ENTITY_FOOD_APPLE           = 4,  // alias -> Strawberry
+    ENTITY_FOOD_CAKE            = 11, // alias -> Beer (replaces Cake)
+    ENTITY_FOOD_TACO            = 16, // alias -> Hotdog
+    ENTITY_FOOD_CHICKEN         = 14, // alias -> Drumstick
+    ENTITY_FOOD_FRIES           = 14, // alias -> Drumstick
     ENTITY_COLLECTIBLE          = 1
 };
+
+static const uint8_t ENTITY_FOOD_FIRST = ENTITY_FOOD_STRAWBERRY; // 4
+static const uint8_t ENTITY_FOOD_LAST  = ENTITY_FOOD_BURGER;     // 18
+static const uint8_t ENTITY_FOOD_COUNT = 15;
 
 // =============================================================================
 // Entity — A single game object on the infinite plane

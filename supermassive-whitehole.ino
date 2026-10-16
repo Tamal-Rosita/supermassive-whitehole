@@ -55,6 +55,7 @@ uint32_t lastMillis = 0;
 // =============================================================================
 void setup() {
   arduboy.begin();
+  arduboy.audio.on();
   arduboy.setFrameRate(TARGET_FPS);
   game.init(storage, audio);
   lastMillis = millis();

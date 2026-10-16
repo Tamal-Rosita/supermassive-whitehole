@@ -384,32 +384,44 @@ static const uint8_t ITEM_SPRITE_HEIGHT    = 16;
 // ITEM SPRITESHEET FRAME INDICES (items_16.png — 9 cols x 2 rows = 18 items)
 // =============================================================================
 // Row 0:
-//   0: Coffee Mug     1: Croissant     2: Burger        3: Pizza
-//   4: Donut          5: Bottle        6: Apple         7: Sushi
-//   8: Ice Cream
+//   0: Drumstick    1: Pizza     2: Burger        3: Hotdog
+//   4: Strawberry   5: Cherries  6: Ice cream     7: Watermelon
+//   8: Corn
 // Row 1:
-//   9: Fries         10: Taco         11: Dollar Bills 12: Diamond
-//  13: Cake          14: Sandwich     15: Cherry       16: Candy
-//  17: Star
+//   9: Coffee Mug  10: Candy    11: Dollar Bills 12: Diamond
+//  13: Beer        14: Donut    15: Carrot       16: Sushi
+//  17: Pretzel
 
-static const uint8_t SPRITE_ITEM_COFFEE      = 0;
-static const uint8_t SPRITE_ITEM_CROISSANT   = 1;
+static const uint8_t SPRITE_ITEM_DRUMSTICK   = 0;
+static const uint8_t SPRITE_ITEM_CHICKEN     = 0; // alias
+static const uint8_t SPRITE_ITEM_PIZZA       = 1;
 static const uint8_t SPRITE_ITEM_BURGER      = 2;
-static const uint8_t SPRITE_ITEM_PIZZA       = 3;
-static const uint8_t SPRITE_ITEM_DONUT       = 4;
-static const uint8_t SPRITE_ITEM_BOTTLE      = 5;
-static const uint8_t SPRITE_ITEM_APPLE       = 6;
-static const uint8_t SPRITE_ITEM_SUSHI       = 7;
-static const uint8_t SPRITE_ITEM_ICECREAM    = 8;
-static const uint8_t SPRITE_ITEM_FRIES       = 9;
-static const uint8_t SPRITE_ITEM_TACO        = 10;
+static const uint8_t SPRITE_ITEM_HOTDOG      = 3;
+static const uint8_t SPRITE_ITEM_STRAWBERRY  = 4;
+static const uint8_t SPRITE_ITEM_CHERRIES    = 5;
+static const uint8_t SPRITE_ITEM_ICECREAM    = 6;
+static const uint8_t SPRITE_ITEM_WATERMELON  = 7;
+static const uint8_t SPRITE_ITEM_CORN        = 8;
+static const uint8_t SPRITE_ITEM_COFFEE      = 9;
+static const uint8_t SPRITE_ITEM_CANDY       = 10;
 static const uint8_t SPRITE_ITEM_BILLS       = 11;
 static const uint8_t SPRITE_ITEM_DIAMOND     = 12;
 static const uint8_t SPRITE_ITEM_COLLECTIBLE = 12;
-static const uint8_t SPRITE_ITEM_CAKE        = 13;
-static const uint8_t SPRITE_ITEM_SANDWICH    = 14;
-static const uint8_t SPRITE_ITEM_CHERRY      = 15;
-static const uint8_t SPRITE_ITEM_CANDY       = 16;
+static const uint8_t SPRITE_ITEM_BEER        = 13;
+static const uint8_t SPRITE_ITEM_CAKE        = 13; // alias
+static const uint8_t SPRITE_ITEM_DONUT       = 14;
+static const uint8_t SPRITE_ITEM_CARROT      = 15;
+static const uint8_t SPRITE_ITEM_SUSHI       = 16;
+static const uint8_t SPRITE_ITEM_PRETZEL     = 17;
+
+// Backward-compatibility aliases
+static const uint8_t SPRITE_ITEM_FRIES       = 0;
+static const uint8_t SPRITE_ITEM_CROISSANT   = 1;
+static const uint8_t SPRITE_ITEM_TACO        = 3;
+static const uint8_t SPRITE_ITEM_APPLE       = 4;
+static const uint8_t SPRITE_ITEM_BOTTLE      = 5;
+static const uint8_t SPRITE_ITEM_SANDWICH    = 15;
+static const uint8_t SPRITE_ITEM_CHERRY      = 5;
 static const uint8_t SPRITE_ITEM_STAR        = 17;
 
 // =============================================================================

@@ -25,9 +25,12 @@
 
 #include <stdint.h>
 
-// End-of-score sentinel value for PROGMEM tone arrays
+// Sentinel values for PROGMEM tone arrays (compatible with ArduboyTones)
 #ifndef TONES_END
-#define TONES_END 0
+#define TONES_END 0x8000
+#endif
+#ifndef TONES_REPEAT
+#define TONES_REPEAT 0x8001
 #endif
 
 // =============================================================================

@@ -31,7 +31,7 @@ void Entity::reset() {
 // Entity::isFood()
 // -----------------------------------------------------------------------------
 bool Entity::isFood() const {
-    return (type >= ENTITY_FOOD_APPLE && type <= ENTITY_FOOD_ICECREAM);
+    return (type >= ENTITY_FOOD_FIRST && type <= ENTITY_FOOD_LAST);
 }
 
 // -----------------------------------------------------------------------------
@@ -48,50 +48,37 @@ bool Entity::isPowerup() const {
     return (type == ENTITY_POWERUP_COFFEE);
 }
 
-// -----------------------------------------------------------------------------
-// EntityManager::init()
-// -----------------------------------------------------------------------------
+// =============================================================================
+// EntityManager implementation
+// =============================================================================
+
 void EntityManager::init() {
     for (uint8_t i = 0; i < MAX_ENTITIES; i++) {
         entities[i].reset();
     }
 }
 
-// -----------------------------------------------------------------------------
-// EntityManager::spawn()
-// -----------------------------------------------------------------------------
-bool EntityManager::spawn(EntityType type, fp32_t worldX, fp32_t worldY) {
+bool EntityManager::spawn(EntityType type, fp32_t x, fp32_t y) {
     for (uint8_t i = 0; i < MAX_ENTITIES; i++) {
-        if (!entities[i].active || entities[i].type == ENTITY_NONE) {
+        if (!entities[i].active) {
             entities[i].type = type;
-            entities[i].x = worldX;
-            entities[i].y = worldY;
+            entities[i].x = x;
+            entities[i].y = y;
             entities[i].active = true;
 
-            switch (type) {
-                case ENTITY_COLLECTIBLE_DIAMOND:
-                case ENTITY_COLLECTIBLE_BILLS:
-                    entities[i].width = COLLECTIBLE_SIZE;
-                    entities[i].height = COLLECTIBLE_SIZE;
-                    break;
-                case ENTITY_POWERUP_COFFEE:
-                    entities[i].width = POWERUP_COFFEE_SIZE;
-                    entities[i].height = POWERUP_COFFEE_SIZE;
-                    break;
-                case ENTITY_FOOD_APPLE:
-                case ENTITY_FOOD_PIZZA:
-                case ENTITY_FOOD_TACO:
-                case ENTITY_FOOD_BURGER:
-                case ENTITY_FOOD_FRIES:
-                case ENTITY_FOOD_CAKE:
-                case ENTITY_FOOD_DONUT:
-                case ENTITY_FOOD_ICECREAM:
-                    entities[i].width = 8;
-                    entities[i].height = 8;
-                    break;
-                default:
-                    entities[i].reset();
-                    return false;
+            // Set size based on type
+            if (type == ENTITY_COLLECTIBLE_DIAMOND || type == ENTITY_COLLECTIBLE_BILLS) {
+                entities[i].width = COLLECTIBLE_SIZE;
+                entities[i].height = COLLECTIBLE_SIZE;
+            } else if (type == ENTITY_POWERUP_COFFEE) {
+                entities[i].width = POWERUP_COFFEE_SIZE;
+                entities[i].height = POWERUP_COFFEE_SIZE;
+            } else if (type >= ENTITY_FOOD_FIRST && type <= ENTITY_FOOD_LAST) {
+                entities[i].width = 8;
+                entities[i].height = 8;
+            } else {
+                entities[i].reset();
+                return false;
             }
             return true;
         }
